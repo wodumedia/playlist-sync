@@ -1,0 +1,10 @@
+{
+  "folders": ["~/Music/Download MP3s", "~/Music/Download Albums"],
+  "apps": {
+    "rekordbox": "off",
+    "music": true,
+    "traktor": { "enabled": false, "collection": "/Users/Shared/Native Instruments/Traktor Pro 3/collection.nml" }
+  },
+  "stagingDir": "~/Library/Application Support/playlist-sync",
+  "intervalMinutes": 30
+}

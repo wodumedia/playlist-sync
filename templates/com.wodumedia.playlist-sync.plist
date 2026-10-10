@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- playlist-sync: one `cli.ts auto` tick at login and every interval. install.sh fills the placeholders. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.wodumedia.playlist-sync</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__NODE__</string>
+    <string>__REPO__/src/cli.ts</string>
+    <string>auto</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>__INTERVAL_SECONDS__</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>__HOME__</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>__REPO__</string>
+  <key>StandardOutPath</key>
+  <string>__STAGING__/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>__STAGING__/launchd.log</string>
+</dict>
+</plist>

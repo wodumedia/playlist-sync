@@ -1,0 +1,28 @@
+{
+  "name": "playlist-sync",
+  "version": "0.1.0",
+  "description": "Drop it in a folder. It's in every app: folders become playlists in rekordbox, Apple Music and Traktor.",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "os": ["darwin"],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "bin": {
+    "playlist-sync": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "tick": "node src/cli.ts auto",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.11"
+  }
+}
