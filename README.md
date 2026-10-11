@@ -157,6 +157,8 @@ Before the first run:
 
 After a Music write, the sync quits Music itself.
 
+If a Music write fails with `Can't get object (-2700)` or "library did not answer", Music has not made its library yet in this macOS account: open Music once as that user, finish its welcome screen (skip the Apple Music sign-in), quit Music, and run again. The writer waits up to 30 s for the library after launching Music.
+
 ## Traktor
 
 Writes `collection.nml`. It adds missing entries and replaces only its own playlist folder; your cues and other playlists are untouched. A backup is made first.

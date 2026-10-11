@@ -23,7 +23,7 @@
 // When even the first row is wrong, or Music refuses a delete, the playlist is rebuilt. `rows` counts the rows added
 // and removed.
 //
-//   osascript -l JavaScript src/writers/music-playlists.js --self-test    # loads music-diff.js, never touches Music
+//   osascript -l JavaScript src/writers/music-playlists.js --self-test    # loads music-diff.js and music-ready.js, never touches Music
 //
 // Prints ONE JSON object on stdout.
 
@@ -84,6 +84,12 @@ function loadDiff() {
   return new Function(`${readText(`${scriptDir()}/music-diff.js`)}\nreturn musicPlaylistDiff;`)();
 }
 
+/** musicLibraryReady and musicFileTracks from music-ready.js (the same text the vitest suite runs). */
+function loadReady() {
+  // Same loader as loadDiff: plain text beside this script, evaluated as a function body.
+  return new Function(`${readText(`${scriptDir()}/music-ready.js`)}\nreturn { musicLibraryReady, musicFileTracks };`)();
+}
+
 // biome-ignore lint/correctness/noUnusedVariables: osascript calls run(argv)
 function run(argv) {
   try {
@@ -100,20 +106,22 @@ function main(argv) {
   const probeOnApply = argv.indexOf('--probe') >= 0;
   STEP = 'diff';
   const musicPlaylistDiff = loadDiff();
+  const { musicLibraryReady, musicFileTracks } = loadReady();
   if (argv.indexOf('--self-test') >= 0) {
-    // Never reaches Music: proves the diff loads and runs inside osascript.
+    // Never reaches Music: proves the diff and the library wait load, and the diff runs, inside osascript.
     const d = musicPlaylistDiff(['/a/Café.mp3', '/b.mp3', null], ['/a/Café.mp3', '/c.mp3'], false);
-    return out({ ok: d.remove.join() === '1,2' && d.add.join() === '1', diff: d });
+    const ready = typeof musicLibraryReady === 'function' && typeof musicFileTracks === 'function';
+    return out({ ok: d.remove.join() === '1,2' && d.add.join() === '1' && ready, ready, diff: d });
   }
   if (!file) throw new Error('usage: osascript -l JavaScript music-playlists.js <playlists.json> [--apply]');
   const spec = JSON.parse(readText(file));
   const folderName = spec.folder;
 
   const Music = Application('Music');
-  if (!Music.running()) {
-    Music.launch();
-    delay(3);
-  }
+  if (!Music.running()) Music.launch();
+  // A first launch in a new account shows a welcome screen and has no library yet: wait for it (up to 30 s).
+  STEP = 'library wait';
+  const lib = musicLibraryReady(Music, delay, 30);
 
   const failed = [];
 
@@ -121,10 +129,7 @@ function main(argv) {
   // location path -> track (file tracks of the library), built once; and back, for the playlists' rows.
   const byPath = {};
   const pathById = {};
-  const lib = Music.libraryPlaylists[0];
-  const fileTracks = lib.fileTracks;
-  const locations = fileTracks.location();
-  const ids = fileTracks.persistentID();
+  const { locations, ids } = musicFileTracks(lib);
   for (let i = 0; i < ids.length; i++) {
     const p = posix(locations[i]);
     if (p) {
