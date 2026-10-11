@@ -507,8 +507,10 @@ export async function foldersCommand(config: Config, args: string[]): Promise<vo
 }
 
 /**
- * `mirrors`: the `From …` folders by hand. Dry run unless --apply (a dry run never runs the Music copy-on-add check:
- * it imports a song). A successful --apply enables the app in the tick (`state.mirror_apps`) and records its hash.
+ * `mirrors`: the `From …` folders by hand. Dry run unless --apply. A dry run never runs the Music copy-on-add check
+ * (it imports a song; `--no-probe` changes nothing there); an --apply runs it before its first Music write until the
+ * state says it passed, as `folders --apply` does. A successful --apply enables the app in the tick
+ * (`state.mirror_apps`) and records its hash.
  */
 export async function mirrorsCommand(baseConfig: Config, args: string[]): Promise<void> {
   const opts = parseMirrorsArgs(args);
@@ -542,7 +544,8 @@ export async function mirrorsCommand(baseConfig: Config, args: string[]): Promis
         : 'library index        none: every track by path only',
     );
     const state = readState(config);
-    const ctx = newContext(config, opts.apply, true, state.music_copy_check);
+    // A dry run never probes (it would import a song); an apply checks before its first Music write until it passed.
+    const ctx = newContext(config, opts.apply, opts.noProbe || !opts.apply, state.music_copy_check);
     // rekordbox.xml is one file: in xml mode the folder playlists go in beside the `From …` folders.
     const folderFiles =
       apps.includes('rekordbox') && config.rekordbox === 'xml'

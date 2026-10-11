@@ -7,9 +7,9 @@ import { type ExecFileSyncOptionsWithStringEncoding, execFileSync } from 'node:c
 
 /** The Music writer (src/writers/music-playlists.js) for one playlists file: generous, an import can be slow. */
 export const MUSIC_WRITE_TIMEOUT_MS = 60 * 60_000;
-/** The Music reader (src/readers/music-read.js): a whole library's playlists. A timeout skips the Music read for
- * that run (the last read is carried). */
-export const MUSIC_READ_TIMEOUT_MS = 120_000;
+/** The Music reader (src/readers/music-read.js): a whole library's playlists. A read of a ~9,000-track library takes
+ * over a minute and has hit 2 min, so 5 min. A timeout skips the Music read for that run (the last read is carried). */
+export const MUSIC_READ_TIMEOUT_MS = 300_000;
 /** A one-line AppleScript (quit Music, delete the probe row). */
 export const OSASCRIPT_SHORT_TIMEOUT_MS = 60_000;
 
