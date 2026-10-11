@@ -119,7 +119,7 @@ The config looks like this:
 Your own playlists in one app show up in the others, each app's in its own playlist folder: `From rekordbox`, `From Music`, `From Traktor`. An app never gets its own.
 
 * Every run reads each enabled app's playlists: rekordbox from a copy of its database (safe while it is open), Traktor from `collection.nml`, Apple Music only while Music is open (it is never launched; while it is closed the last read is used, kept in `<stagingDir>/collections.json`).
-* A playlist inside folders is named `Group / Sub / Name`. rekordbox My Tags become playlists named `Group / Tag` (`Genre / House`).
+* A playlist inside folders is named `Group / Sub / Name`. rekordbox My Tags come along too, as playlists — see Tags as playlists below.
 * Left out: smart lists, tracks whose file is not on disk (streamed songs too), playlists with no track on disk, your folder playlists (the root folders above) and the `From …` folders themselves. rekordbox's History lists are not read.
 * Each app gets its copy as soon as that app alone is closed, without waiting for the others. In rekordbox `xml` mode the `From …` folders go into the same `rekordbox.xml`, so rekordbox never has to be closed.
 * The `From …` folders are the tool's own, like the root folders: a playlist in one that no longer exists in its app is removed. When an app has nothing to copy, its `From …` folder in the other apps is left as it is.
@@ -134,6 +134,15 @@ node src/cli.ts mirrors --apply --rekordbox
 ```
 
 `mirrors --apply` with no app writes every enabled app. Until an app is turned on, the log says once per change `mirrors not enabled for traktor: run mirrors --apply --traktor`.
+
+## Tags as playlists
+
+The tags you set in rekordbox (My Tags) are read along with its playlists. Every tag becomes a playlist named `Group / Tag`, for example `Genre / House` or `Mood / Peak time`, inside the `From rekordbox` folder in Apple Music and Traktor. So the tags you set in rekordbox are playable in the other apps.
+
+* Flat: one playlist per tag, kept up to date like the other mirrors.
+* Tags are never written back into rekordbox, and the other apps have no tags to copy.
+* A tag with no track on disk is left out.
+* No separate switch: it is on whenever `mirrors --apply --music` or `--traktor` is on.
 
 ## Apple Music
 
