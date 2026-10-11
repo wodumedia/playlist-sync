@@ -9,6 +9,10 @@ import {
   appOfKey,
   backupsToRemove,
   decideFolders,
+  decideMirrors,
+  freshAutoState,
+  mirrorsAppliedText,
+  parseMirrorsArgs,
   foldersAppliedText,
   foldersHash,
   logLine,
@@ -118,6 +122,9 @@ describe('state', () => {
       last_folders_hash: {},
       music_copy_check: null,
       music_copy_check_refused_at: null,
+      mirror_apps: [],
+      last_mirrors_hash: {},
+      mirrors_noted_hash: {},
     };
     expect(parseAutoState(undefined)).toEqual(fresh);
     expect(parseAutoState('garbage')).toEqual(fresh);
@@ -129,6 +136,9 @@ describe('state', () => {
       last_folders_hash: { music: 'h' },
       music_copy_check: null,
       music_copy_check_refused_at: null,
+      mirror_apps: [],
+      last_mirrors_hash: {},
+      mirrors_noted_hash: {},
     });
   });
   it('the old single-string hash reads as no hashes (every app writes once)', () => {
@@ -187,7 +197,7 @@ describe('log', () => {
     expect(
       foldersAppliedText([
         {
-          folder: 'DJ',
+          folder: 'Crates',
           playlists: 128,
           tracks: 7262,
           results: [
@@ -198,7 +208,7 @@ describe('log', () => {
         },
       ]),
     ).toBe(
-      'DJ 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157 missing, 3 added to the collection; music 7,262; traktor failed: boom)',
+      'Crates 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157 missing, 3 added to the collection; music 7,262; traktor failed: boom)',
     );
   });
 });
@@ -218,5 +228,85 @@ describe('args', () => {
     });
     expect(() => parseFoldersArgs(['--apply', '--dry-run'])).toThrow(/pick one/);
     expect(() => parseFoldersArgs(['--dir'])).toThrow(/unknown option/);
+  });
+});
+
+describe('playlist mirrors', () => {
+  it('parseMirrorsArgs: dry run by default, app flags, collection path, --no-probe', () => {
+    expect(parseMirrorsArgs([])).toEqual({ apply: false, apps: null, traktorCollection: null, noProbe: false });
+    expect(parseMirrorsArgs(['--apply', '--music', '--rekordbox', '--no-probe'])).toEqual({
+      apply: true,
+      apps: ['rekordbox', 'music'],
+      traktorCollection: null,
+      noProbe: true,
+    });
+    expect(parseMirrorsArgs(['--traktor-collection', '/x.nml']).traktorCollection).toBe('/x.nml');
+    expect(() => parseMirrorsArgs(['--apply', '--dry-run'])).toThrow(/pick one/);
+    expect(() => parseMirrorsArgs(['--traktor-collection'])).toThrow(/needs a value/);
+    expect(() => parseMirrorsArgs(['--bogus'])).toThrow(/unknown option/);
+  });
+
+  it('state: mirror fields default to empty and are read tolerantly', () => {
+    expect(parseAutoState({}).mirror_apps).toEqual([]);
+    expect(parseAutoState({ mirror_apps: 'x', last_mirrors_hash: [1] }).mirror_apps).toEqual([]);
+    const s = parseAutoState({
+      mirror_apps: ['music', 'bogus', 'rekordbox'],
+      last_mirrors_hash: { music: 'h', rekordbox: 5 },
+      mirrors_noted_hash: { traktor: 'n' },
+    });
+    expect(s.mirror_apps).toEqual(['rekordbox', 'music']);
+    expect(s.last_mirrors_hash).toEqual({ music: 'h' });
+    expect(s.mirrors_noted_hash).toEqual({ traktor: 'n' });
+  });
+
+  it('decideMirrors: not enabled notes once per change; enabled applies when that app is closed, waits when open', () => {
+    const st = (over = {}) => ({ ...freshAutoState(), ...over });
+    expect(decideMirrors(st(), 'music', 'h1', [])).toEqual({ action: 'not-enabled', note: true });
+    expect(decideMirrors(st({ mirrors_noted_hash: { music: 'h1' } }), 'music', 'h1', [])).toEqual({
+      action: 'not-enabled',
+      note: false,
+    });
+    expect(decideMirrors(st({ mirrors_noted_hash: { music: 'h1' } }), 'music', 'h2', [])).toEqual({
+      action: 'not-enabled',
+      note: true,
+    });
+    const on = st({ mirror_apps: ['music'], last_mirrors_hash: { music: 'h1' } });
+    expect(decideMirrors(on, 'music', 'h1', ['Music'])).toEqual({ action: 'unchanged' });
+    expect(decideMirrors(on, 'music', 'h2', ['Music'])).toEqual({ action: 'waiting', waitingOn: ['Music'] });
+    expect(decideMirrors(on, 'music', 'h2', [])).toEqual({ action: 'apply' });
+    // Only the app itself blocks: another app being open is not passed in, so it applies.
+    expect(decideMirrors(st({ mirror_apps: ['traktor'] }), 'traktor', 'h', [])).toEqual({ action: 'apply' });
+  });
+
+  it('mirrorsAppliedText: counts per folder and the writer result', () => {
+    expect(
+      mirrorsAppliedText('music', [
+        {
+          folder: 'From rekordbox',
+          playlists: 154,
+          tracks: 9001,
+          result: { action: 'applied', counts: { playlists: 154, tracks: 8990, missing: 0 } },
+        },
+      ]),
+    ).toBe('From rekordbox 154 playlists/9,001 tracks (music 8,990)');
+    expect(
+      mirrorsAppliedText('traktor', [
+        { folder: 'From Music', playlists: 2, tracks: 5, result: { action: 'failed: x', counts: null } },
+      ]),
+    ).toBe('From Music 2 playlists/5 tracks (traktor failed: x)');
+    expect(
+      mirrorsAppliedText('rekordbox', [
+        {
+          folder: 'From Traktor',
+          playlists: 1,
+          tracks: 2,
+          result: { action: 'applied', counts: { playlists: 1, tracks: 2, missing: 0, added: 1 } },
+        },
+      ]),
+    ).toBe('From Traktor 1 playlists/2 tracks (rekordbox 2 linked, 0 missing, 1 added to the collection)');
+    expect(mirrorsAppliedText('music', [{ folder: 'From Traktor', playlists: 1, tracks: 2, result: null }])).toBe(
+      'From Traktor 1 playlists/2 tracks',
+    );
+    expect(mirrorsAppliedText('music', [])).toBe('music nothing to copy');
   });
 });

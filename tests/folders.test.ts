@@ -233,7 +233,8 @@ describe('the fixture folders (walked from disk)', () => {
 
   it('walkFolder does not enter hidden names and records sizes', () => {
     const entries = walkFolder(root);
-    expect(entries.some((e) => e.path.includes('/.'))).toBe(false);
+    // Relative to the root: the checkout itself may sit under a hidden folder.
+    expect(entries.some((e) => e.path.slice(root.length).includes('/.'))).toBe(false);
     expect(entries.find((e) => e.path.endsWith('zero.mp3'))?.size).toBe(0);
   });
 

@@ -1,0 +1,40 @@
+{
+  "content": [
+    { "id": "101", "path": "/Users/dj/Music/House/one.mp3", "title": "One", "artist": "Artist A", "deleted": false },
+    { "id": "102", "path": "/Users/dj/Music/House/one.mp3", "title": "One again", "artist": "Artist A", "deleted": false },
+    { "id": "103", "path": "/Users/dj/Music/gone.mp3", "title": "Gone", "artist": "Artist B", "deleted": false },
+    { "id": "104", "path": "/Users/dj/Videos/clip.mp4", "title": "Clip", "artist": "", "deleted": false },
+    { "id": "105", "path": "/Users/dj/Music/House/two.mp3", "title": "Two", "artist": "Artist C", "deleted": false },
+    { "id": "106", "path": "/Users/dj/Music/old.mp3", "title": "Old", "artist": "", "deleted": true }
+  ],
+  "playlists": [
+    { "id": "1", "seq": 1, "name": "Sets", "attribute": 1, "parent_id": "root", "smart": false, "deleted": false, "songs": [] },
+    { "id": "5", "seq": 1, "name": "Club", "attribute": 1, "parent_id": "1", "smart": false, "deleted": false, "songs": [] },
+    {
+      "id": "2", "seq": 1, "name": "Peak", "attribute": 0, "parent_id": "5", "smart": false, "deleted": false,
+      "songs": [
+        { "content_id": "104", "track_no": 4 },
+        { "content_id": "101", "track_no": 1 },
+        { "content_id": "102", "track_no": 2 },
+        { "content_id": "103", "track_no": 3 }
+      ]
+    },
+    { "id": "3", "seq": 2, "name": "Downloads", "attribute": 1, "parent_id": "root", "smart": false, "deleted": false, "songs": [] },
+    {
+      "id": "6", "seq": 1, "name": "Crates", "attribute": 0, "parent_id": "3", "smart": false, "deleted": false,
+      "songs": [{ "content_id": "105", "track_no": 1 }]
+    },
+    { "id": "4", "seq": 3, "name": "Auto", "attribute": 4, "parent_id": "root", "smart": true, "deleted": false, "songs": [] },
+    { "id": "7", "seq": 4, "name": "Removed", "attribute": 0, "parent_id": "root", "smart": false, "deleted": true, "songs": [] }
+  ],
+  "my_tags": [
+    { "id": "30", "seq": 2, "name": "Situation", "attribute": 1, "parent_id": "root", "deleted": false, "songs": [] },
+    { "id": "31", "seq": 1, "name": "Opener", "attribute": 0, "parent_id": "30", "deleted": false, "songs": [] },
+    { "id": "20", "seq": 1, "name": "Genre", "attribute": 1, "parent_id": "root", "deleted": false, "songs": [] },
+    {
+      "id": "21", "seq": 1, "name": "Deep", "attribute": 0, "parent_id": "20", "deleted": false,
+      "songs": [{ "content_id": "105", "track_no": null }]
+    },
+    { "id": "22", "seq": 2, "name": "Dropped", "attribute": 0, "parent_id": "20", "deleted": true, "songs": [] }
+  ]
+}

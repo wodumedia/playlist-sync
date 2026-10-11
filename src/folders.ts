@@ -99,15 +99,17 @@ export function indexByPath(index: LibraryIndex | null): Map<string, LibraryTrac
 }
 
 /** One playlist track for the file at `path` (NFC): the index row's id, volume, artist and title when the index knows
- * the file, else the volume from the path and artist/title from the file name. */
+ * the file, else the volume from the path and artist/title from `fallback` (what another app calls the track) when it
+ * has either, else from the file name. */
 export function trackFromPath(
   path: string,
   i: number,
   byPath: Map<string, LibraryTrack>,
   bootVolume: string,
+  fallback?: { artist: string; title: string },
 ): { track: PlaylistTrack; row: LibraryTrack | undefined } {
   const row = byPath.get(path);
-  const named = artistTitleFromName(path);
+  const named = fallback && (fallback.artist || fallback.title) ? fallback : artistTitleFromName(path);
   return {
     row,
     track: {

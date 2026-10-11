@@ -12,7 +12,8 @@ import { bootVolumeName, FOLDER_AUDIO_RE, volumeOf } from './folders.ts';
 import { type LibraryIndex, LibraryIndexSchema, type LibraryTrack } from './library.ts';
 import { running } from './running.ts';
 import { copySqliteFamily, dbChangedAt } from './sqlite-files.ts';
-import { stagingPaths } from './tick.ts';
+import type { RawDump } from './collect.ts';
+import { stagingPaths } from './paths.ts';
 
 const DUMP_SCRIPT = join(REPO, 'src', 'rekordbox-dump.py');
 
@@ -30,7 +31,18 @@ export function buildIndex(
   content: RawContent[],
   opts: { bootVolume: string; realpath: (p: string) => string | null; now: string; dbModifiedAt: string | null },
 ): LibraryIndex {
+  return buildIndexWithMap(content, opts).index;
+}
+
+/** `buildIndex`, plus `contentIdMap`: every content id that made it into the index (the kept row, or a dropped
+ * duplicate of the same file) → the kept row's id. A playlist song is resolved through it; an id not in the map is
+ * not in the index (deleted, or not an audio file). */
+export function buildIndexWithMap(
+  content: RawContent[],
+  opts: { bootVolume: string; realpath: (p: string) => string | null; now: string; dbModifiedAt: string | null },
+): { index: LibraryIndex; contentIdMap: Map<string, string> } {
   const byPath = new Map<string, LibraryTrack>();
+  const pathOfId = new Map<string, string>();
   for (const c of content) {
     if (c.deleted || !c.path || !FOLDER_AUDIO_RE.test(c.path)) continue;
     const real = opts.realpath(c.path);
@@ -43,19 +55,23 @@ export function buildIndex(
       title: c.title,
       exists: real !== null,
     };
+    pathOfId.set(c.id, path);
     const had = byPath.get(path);
     if (!had || (!had.exists && t.exists)) byPath.set(path, t);
   }
-  return LibraryIndexSchema.parse({
+  const contentIdMap = new Map<string, string>();
+  for (const [id, path] of pathOfId) contentIdMap.set(id, byPath.get(path)!.id);
+  const index = LibraryIndexSchema.parse({
     version: 1,
     source: 'rekordbox',
     generated_at: opts.now,
     db_modified_at: opts.dbModifiedAt,
     tracks: [...byPath.values()],
   });
+  return { index, contentIdMap };
 }
 
-const realpathOrNull = (p: string): string | null => {
+export const realpathOrNull = (p: string): string | null => {
   try {
     return realpathSync.native(p);
   } catch {
@@ -63,12 +79,13 @@ const realpathOrNull = (p: string): string | null => {
   }
 };
 
-export function indexCommand(config: Config): void {
+/** Copies master.db (with its -wal/-shm and masterPlaylists6.xml) into `<staging>/rekordbox-dryrun` and dumps the
+ * copy: content rows, playlists and My Tags. Reading a copy is safe while rekordbox runs. */
+export function dumpRekordbox(config: Config): { raw: RawDump; dbModifiedAt: string | null } {
   const db = config.rekordboxDb;
   if (!existsSync(db)) throw new Error(`no rekordbox database at ${db}`);
   if (!existsSync(config.venvPython))
     throw new Error(`no Python venv at ${config.venvPython}: run install.sh (it installs pyrekordbox)`);
-  if (running('rekordbox')) console.warn('rekordbox is running: the copy is read as it stands on disk (fine for an index).');
   const dbModifiedAt = dbChangedAt(db);
   const snap = join(config.stagingDir, 'rekordbox-dryrun');
   mkdirSync(snap, { recursive: true });
@@ -80,7 +97,13 @@ export function indexCommand(config: Config): void {
       encoding: 'utf8',
       maxBuffer: 512 * 1024 * 1024,
     }),
-  ) as { content: RawContent[] };
+  ) as RawDump;
+  return { raw, dbModifiedAt };
+}
+
+export function indexCommand(config: Config): void {
+  if (running('rekordbox')) console.warn('rekordbox is running: the copy is read as it stands on disk (fine for an index).');
+  const { raw, dbModifiedAt } = dumpRekordbox(config);
   const index = buildIndex(raw.content, {
     bootVolume: bootVolumeName(),
     realpath: realpathOrNull,

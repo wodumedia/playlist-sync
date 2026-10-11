@@ -45,6 +45,12 @@ export interface AutoState {
   music_copy_check: 'passed' | null;
   /** When the check last found Music copying (ISO): the tick re-checks only once this is 24 h old. */
   music_copy_check_refused_at: string | null;
+  /** The apps the tick writes the `From …` folders into: added by a successful `mirrors --apply --<app>`. */
+  mirror_apps: LiveApp[];
+  /** Per app: the mirrors hash at that app's last successful mirrors write. */
+  last_mirrors_hash: Record<string, string>;
+  /** Per app not in `mirror_apps`: the hash the tick last logged the "not enabled" hint for (one line per change). */
+  mirrors_noted_hash: Record<string, string>;
 }
 
 export const MUSIC_RECHECK_MS = 24 * 60 * 60 * 1000;
@@ -62,6 +68,9 @@ export const freshAutoState = (): AutoState => ({
   last_folders_hash: {},
   music_copy_check: null,
   music_copy_check_refused_at: null,
+  mirror_apps: [],
+  last_mirrors_hash: {},
+  mirrors_noted_hash: {},
 });
 
 /** The state file's contents (already JSON-parsed, or undefined when missing/corrupt) → a valid state; a field of the
@@ -72,16 +81,21 @@ export function parseAutoState(raw: unknown): AutoState {
   const r = raw as Record<string, unknown>;
   const s = (k: 'last_run' | 'last_result' | 'music_copy_check_refused_at'): string | null =>
     typeof r[k] === 'string' && r[k] ? (r[k] as string) : null;
-  const hashes: Record<string, string> = {};
-  const h = r.last_folders_hash;
-  if (h && typeof h === 'object' && !Array.isArray(h))
-    for (const [k, v] of Object.entries(h)) if (typeof v === 'string' && v) hashes[k] = v;
+  const hashMap = (h: unknown): Record<string, string> => {
+    const out: Record<string, string> = {};
+    if (h && typeof h === 'object' && !Array.isArray(h))
+      for (const [k, v] of Object.entries(h)) if (typeof v === 'string' && v) out[k] = v;
+    return out;
+  };
   return {
     last_run: s('last_run'),
     last_result: s('last_result'),
-    last_folders_hash: hashes,
+    last_folders_hash: hashMap(r.last_folders_hash),
     music_copy_check: r.music_copy_check === 'passed' ? 'passed' : null,
     music_copy_check_refused_at: s('music_copy_check_refused_at'),
+    mirror_apps: Array.isArray(r.mirror_apps) ? LIVE_APPS.filter((a) => (r.mirror_apps as unknown[]).includes(a)) : [],
+    last_mirrors_hash: hashMap(r.last_mirrors_hash),
+    mirrors_noted_hash: hashMap(r.mirrors_noted_hash),
   };
 }
 
@@ -233,6 +247,92 @@ export function recordHashes(
   return out;
 }
 
+// ---- playlist mirrors ----
+
+export interface MirrorsArgs {
+  apply: boolean;
+  /** Picked with --rekordbox/--music/--traktor; null = every active app. */
+  apps: LiveApp[] | null;
+  /** Overrides `apps.traktor.collection` for this run. */
+  traktorCollection: string | null;
+  noProbe: boolean;
+}
+
+/** `mirrors [--dry-run|--apply] [--rekordbox] [--music] [--traktor] [--traktor-collection <path>] [--no-probe]`. */
+export function parseMirrorsArgs(args: string[]): MirrorsArgs {
+  let apply = false;
+  let dryRun = false;
+  const picked = new Set<LiveApp>();
+  let traktorCollection: string | null = null;
+  let noProbe = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === '--apply') apply = true;
+    else if (a === '--dry-run') dryRun = true;
+    else if (a === '--rekordbox' || a === '--traktor' || a === '--music') picked.add(a.slice(2) as LiveApp);
+    else if (a === '--traktor-collection') {
+      const v = args[i + 1];
+      if (!v || v.startsWith('--')) throw new Error(`${a} needs a value`);
+      traktorCollection = v;
+      i++;
+    } else if (a === '--no-probe') noProbe = true;
+    else throw new Error(`unknown option ${a}`);
+  }
+  if (apply && dryRun) throw new Error('--apply and --dry-run both given: pick one');
+  return { apply, apps: picked.size ? LIVE_APPS.filter((x) => picked.has(x)) : null, traktorCollection, noProbe };
+}
+
+export type MirrorsPlan =
+  | { action: 'unchanged' }
+  /** Not enabled for this app: `note` = log the "not enabled" hint (once per change). */
+  | { action: 'not-enabled'; note: boolean }
+  | { action: 'waiting'; waitingOn: string[] }
+  | { action: 'apply' };
+
+/** The tick's decision for one app's mirrors. `blocking` = the open apps that block writing this app (only the app
+ * itself: each app gets its copy as soon as it alone is closed). */
+export function decideMirrors(
+  state: Pick<AutoState, 'mirror_apps' | 'last_mirrors_hash' | 'mirrors_noted_hash'>,
+  app: LiveApp,
+  hash: string,
+  blocking: string[],
+): MirrorsPlan {
+  if (!state.mirror_apps.includes(app)) {
+    if ((state.last_mirrors_hash[app] ?? null) === hash) return { action: 'unchanged' };
+    return { action: 'not-enabled', note: (state.mirrors_noted_hash[app] ?? null) !== hash };
+  }
+  if ((state.last_mirrors_hash[app] ?? null) === hash) return { action: 'unchanged' };
+  return blocking.length ? { action: 'waiting', waitingOn: [...blocking] } : { action: 'apply' };
+}
+
+export interface MirrorsAppliedItem {
+  folder: string;
+  playlists: number;
+  tracks: number;
+  result: Pick<AppResult, 'action' | 'counts'> | null;
+}
+
+/** The log text after a mirrors write to one app: "From rekordbox 154 playlists/9,001 tracks (music 8,990)"; a failed
+ * or skipped writer shows its action. */
+export function mirrorsAppliedText(app: LiveApp, items: MirrorsAppliedItem[]): string {
+  if (!items.length) return `${app} nothing to copy`;
+  return items
+    .map((m) => {
+      const r = m.result;
+      let tail = '';
+      if (r) {
+        if (r.action !== 'applied' || !r.counts) tail = ` (${app} ${r.action})`;
+        else if (app === 'rekordbox')
+          tail =
+            ` (rekordbox ${n(r.counts.tracks)} linked, ${n(r.counts.missing)} missing` +
+            (r.counts.added ? `, ${n(r.counts.added)} added to the collection)` : ')');
+        else tail = ` (${app} ${n(r.counts.tracks)})`;
+      }
+      return `${m.folder} ${n(m.playlists)} playlists/${n(m.tracks)} tracks${tail}`;
+    })
+    .join(', ');
+}
+
 export interface AppResult {
   app: LiveApp;
   /** `applied`, `dry run`, `skipped: …` or `failed: …`. */
@@ -251,7 +351,7 @@ export interface FoldersAppliedDir {
 
 const n = (x: number) => x.toLocaleString('en-US');
 
-/** The log text after a folders apply: "DJ 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157
+/** The log text after a folders apply: "Crates 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157
  * missing; music 7,262), Extras …". A failed or skipped app shows its action instead of counts. */
 export function foldersAppliedText(dirs: FoldersAppliedDir[]): string {
   return dirs

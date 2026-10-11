@@ -589,26 +589,45 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 3: Python, only for rekordbox "db" mode
+# Step 3: Python, for rekordbox. "db" mode writes the database with it; both
+# modes read rekordbox's own playlists with it (for the "From rekordbox" folders).
 # ---------------------------------------------------------------------------
 
-if [ "$REKORDBOX_MODE" = "db" ]; then
-  step "Setting up Python for rekordbox database mode"
+PY_ERR=""
+setup_python() {
   if ! command -v python3 >/dev/null 2>&1; then
-    die "python3 was not found, and rekordbox db mode needs it. Run: xcode-select --install (Apple's Command Line Tools include Python 3), or: brew install python. Then open a new Terminal window and run ./install.sh again."
+    PY_ERR="python3 was not found, and rekordbox needs it. Run: xcode-select --install (Apple's Command Line Tools include Python 3), or: brew install python. Then open a new Terminal window and run ./install.sh again."
+    return 1
   fi
   if [ ! -f "$REPO_DIR/requirements.txt" ]; then
-    die "Cannot find requirements.txt in $REPO_DIR. Is the download complete?"
+    PY_ERR="Cannot find requirements.txt in $REPO_DIR. Is the download complete?"
+    return 1
   fi
   if [ ! -x "$REPO_DIR/.venv/bin/python" ]; then
     if ! python3 -m venv "$REPO_DIR/.venv"; then
-      die "Could not create the Python environment in $REPO_DIR/.venv."
+      PY_ERR="Could not create the Python environment in $REPO_DIR/.venv."
+      return 1
     fi
   fi
   if ! "$REPO_DIR/.venv/bin/pip" install --disable-pip-version-check -r "$REPO_DIR/requirements.txt"; then
-    die "Could not install the Python packages from requirements.txt. Check your internet connection and run install.sh again."
+    PY_ERR="Could not install the Python packages from requirements.txt. Check your internet connection and run install.sh again."
+    return 1
   fi
+  return 0
+}
+
+if [ "$REKORDBOX_MODE" = "db" ]; then
+  step "Setting up Python for rekordbox database mode"
+  setup_python || die "$PY_ERR"
   say "Python environment ready."
+elif [ "$REKORDBOX_MODE" = "xml" ]; then
+  step "Setting up Python to read your rekordbox playlists"
+  if setup_python; then
+    say "Python environment ready."
+  else
+    say "Skipped: $PY_ERR"
+    say "Everything else works; only your rekordbox playlists are not copied to the other apps until Python is set up."
+  fi
 fi
 
 step "Checking your settings"

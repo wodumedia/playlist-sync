@@ -8,7 +8,7 @@ import { ConfigError, type Config, configPath, configWarnings, loadConfig } from
 import { activeApps, enabledApps } from './apply.ts';
 import { indexCommand } from './index.ts';
 import { openApps } from './running.ts';
-import { auto, foldersCommand, lastLogLines, readState, stagingPaths } from './tick.ts';
+import { auto, foldersCommand, lastLogLines, mirrorsCommand, readState, stagingPaths } from './tick.ts';
 
 const LABEL = 'com.wodumedia.playlist-sync';
 
@@ -21,6 +21,9 @@ function usage(code: number): never {
       '                         those apps are closed (else wait for the next tick). --dry-run prints, writes nothing.',
       '  folders [--apply] [--rekordbox] [--music] [--traktor] [--no-probe]',
       '                         the same by hand; dry run unless --apply; app flags pick among the enabled apps.',
+      '  mirrors [--apply] [--rekordbox] [--music] [--traktor] [--traktor-collection <path>] [--no-probe]',
+      '                         the other apps\' playlists as From rekordbox / From Music / From Traktor folders; dry',
+      '                         run unless --apply. --apply --<app> writes them now and enables them in the tick.',
       '  status                 config, open apps, last tick state and the last 10 log lines',
       '  config-check           validate the config file',
       '  index                  dump rekordbox content ids to <staging>/index.json (optional)',
@@ -62,6 +65,7 @@ function status(c: Config): void {
   );
   console.log(`launchd agent        ${agentLoaded() ? 'loaded' : 'not loaded'} (${LABEL})`);
   const state = readState(c);
+  console.log(`mirrors              ${state.mirror_apps.length ? `on for ${state.mirror_apps.join(', ')}` : 'off (run mirrors --apply --<app>)'}`);
   console.log(`last tick            ${state.last_run ?? 'never'}`);
   if (state.last_result) console.log(`last result          ${state.last_result}`);
   const lines = lastLogLines(c, 10);
@@ -78,11 +82,12 @@ function configCheck(c: Config): void {
 const [command, ...rest] = process.argv.slice(2);
 try {
   if (!command || command === 'help' || command === '--help' || command === '-h') usage(0);
-  const known = ['auto', 'folders', 'status', 'config-check', 'index'];
+  const known = ['auto', 'folders', 'mirrors', 'status', 'config-check', 'index'];
   if (!known.includes(command)) usage(1);
   const config = loadConfig();
   if (command === 'auto') await auto(config, rest);
   else if (command === 'folders') await foldersCommand(config, rest);
+  else if (command === 'mirrors') await mirrorsCommand(config, rest);
   else if (command === 'status') status(config);
   else if (command === 'config-check') configCheck(config);
   else if (command === 'index') indexCommand(config);

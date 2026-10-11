@@ -5,15 +5,13 @@ Keep your Apple Music, rekordbox and Traktor databases in sync automatically.
 3. You don't import anything or drag it into playlists by hand.
 4. Playlists are created automatically in Apple Music, rekordbox and Traktor, and kept up to date.
 
-Coming next: a playlist you make in any one app shows up in the other two.
-
 ## How it works
 
 * Your folders are your playlists. Pick any music folder — one or several, anywhere on your Mac. Every folder inside it becomes a playlist with the same name in rekordbox, Apple Music and Traktor. Make a new folder and you get a new playlist.
-* It runs every 30 minutes and when you log in. It checks your folders for anything new, and when there is something, it updates all your apps at once.
+* It runs every 30 minutes and when you log in. It checks your folders for anything new, and when there is something, it updates all your apps at once. Then it reads each app's own playlists and updates the `From …` folders of the apps you turned that on for.
 * It waits until you're finished. It never changes an app's library while you're using that app. If rekordbox, Music or Traktor is open, it waits and checks again in 30 minutes. Once they're closed, every app gets the update in one pass, so they always match.
 * It's safe. It backs up each app's library before writing, only adds or rebuilds playlists, and never deletes a song file.
-* Playlists move between apps too. A playlist you make in rekordbox shows up in Music and Traktor under From rekordbox. Each app gets that copy as soon as it alone is closed, without waiting for the others. *(Coming in the next release — v1 syncs folders → apps.)*
+* Playlists move between apps too. A playlist you make in rekordbox shows up in Music and Traktor under From rekordbox. Each app gets that copy as soon as it alone is closed, without waiting for the others.
 
 Your part: save music to the folders, and quit rekordbox, Music and Traktor when you're done. The sync does the rest.
 
@@ -61,7 +59,7 @@ node -v
 git --version
 ```
 
-`node -v` should print `v22.18.0` or higher. Python 3 is only needed for rekordbox `db` mode and comes with the Command Line Tools.
+`node -v` should print `v22.18.0` or higher. Python 3 comes with the Command Line Tools and is needed for rekordbox: `db` mode writes with it, and both modes read your rekordbox playlists with it (`install.sh` sets it up).
 
 ### Install
 
@@ -116,6 +114,27 @@ The config looks like this:
 * In each app the playlists sit inside a playlist folder named like the root folder.
 * That playlist folder is the tool's own: a playlist in it with no subfolder behind it is removed (delete a subfolder and its playlist goes). Playlists outside it are never touched.
 
+## Playlists move between apps
+
+Your own playlists in one app show up in the others, each app's in its own playlist folder: `From rekordbox`, `From Music`, `From Traktor`. An app never gets its own.
+
+* Every run reads each enabled app's playlists: rekordbox from a copy of its database (safe while it is open), Traktor from `collection.nml`, Apple Music only while Music is open (it is never launched; while it is closed the last read is used, kept in `<stagingDir>/collections.json`).
+* A playlist inside folders is named `Group / Sub / Name`. rekordbox My Tags become playlists named `Group / Tag` (`Genre / House`).
+* Left out: smart lists, tracks whose file is not on disk (streamed songs too), playlists with no track on disk, your folder playlists (the root folders above) and the `From …` folders themselves. rekordbox's History lists are not read.
+* Each app gets its copy as soon as that app alone is closed, without waiting for the others. In rekordbox `xml` mode the `From …` folders go into the same `rekordbox.xml`, so rekordbox never has to be closed.
+* The `From …` folders are the tool's own, like the root folders: a playlist in one that no longer exists in its app is removed. When an app has nothing to copy, its `From …` folder in the other apps is left as it is.
+
+It is off until you turn it on, one app at a time. See what it would write first, then turn it on (that app must be closed):
+
+```bash
+node src/cli.ts mirrors                      # dry run: what each app would get
+node src/cli.ts mirrors --apply --music      # write Music's From folders now and keep them updated
+node src/cli.ts mirrors --apply --traktor
+node src/cli.ts mirrors --apply --rekordbox
+```
+
+`mirrors --apply` with no app writes every enabled app. Until an app is turned on, the log says once per change `mirrors not enabled for traktor: run mirrors --apply --traktor`.
+
 ## Apple Music
 
 Before the first run:
@@ -131,7 +150,7 @@ Writes `collection.nml`. It adds missing entries and replaces only its own playl
 
 ## Backups and safety
 
-* It writes only while every app it writes is closed (rekordbox only in `db` mode; `xml` mode writes its file any time). Otherwise nothing is written, the log says `folders waiting: Music running` and it tries again on the next tick. A by-hand `folders --apply` refuses instead, before writing anything.
+* It writes only while every app it writes is closed (rekordbox only in `db` mode; `xml` mode writes its file any time). Otherwise nothing is written, the log says `folders waiting: Music running` (or `mirrors waiting: Music running`) and it tries again on the next tick. A by-hand `folders --apply` or `mirrors --apply` refuses instead, before writing anything.
 * Each app is tracked on its own: an app is written when its folders changed since its own last good write. An app that fails (or a Music `refused`) is tried again on the next tick without rewriting the others. Enabling an app, or changing the rekordbox mode, writes it on the next tick even when the folders did not change.
 * Before each write, a backup goes to `<stagingDir>/backups/<app>-<timestamp>/`. The last 10 per app are kept.
   * rekordbox: `master.db`, its wal/shm files and `masterPlaylists6.xml`
@@ -148,6 +167,7 @@ Run these from the `playlist-sync` folder.
 node src/cli.ts auto --dry-run      # what the next tick would do
 node src/cli.ts folders             # the same by hand, dry run (add --rekordbox, --music or --traktor to pick apps)
 node src/cli.ts folders --apply     # write now (every app it writes must be closed)
+node src/cli.ts mirrors             # the From folders, dry run (--apply --music etc. turns them on, see above)
 node src/cli.ts status              # settings, open apps, whether the agent is loaded, last run, last log lines
 node src/cli.ts config-check
 node src/cli.ts index               # optional, db mode's Python needed: rekordbox's own ids into <stagingDir>/index.json

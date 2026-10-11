@@ -8,6 +8,7 @@ playlist-sync is a free macOS tool that turns a DJ's music folders into playlist
 - Always run `node src/cli.ts auto --dry-run` and show the user the output before any `--apply`.
 - Never run a write while rekordbox, Music or Traktor is open. Ask the user to quit the app first.
 - Before its first Music write the sync checks by itself whether Music copies files on add (it adds ONE song to the library). `music refused: "Copy files to Music Media folder" is on …` in the log means that setting is on: have the user turn it off, then run `node src/cli.ts folders --music` to re-check at once (the tick re-checks only once a day after a refusal). A `folders` dry run with Music on runs the same check; pass `--no-probe` to skip it.
+- `mirrors` (the `From rekordbox` / `From Music` / `From Traktor` folders): run `node src/cli.ts mirrors` (dry run) and show the output first; `node src/cli.ts mirrors --apply --<app>` writes that app and turns it on in the tick. Never while that app is open.
 - Never delete song files, backups, or the user's libraries.
 - Never change the rekordbox mode to `db` without showing the user the warning from the README ("rekordbox: choose how it writes") and getting a yes.
 - Two things are the user's own clicks. Tell them exactly where:
@@ -21,7 +22,7 @@ playlist-sync is a free macOS tool that turns a DJ's music folders into playlist
 
 When a user asks you to set up playlist-sync, do it in this order. The users are mostly DJs who are new to Terminal: use plain language and explain what each step does.
 
-1. Check the prerequisites: `git --version`, `node -v` (must be 22.18 or newer) and, only if the user wants rekordbox `db` mode, `python3 --version`.
+1. Check the prerequisites: `git --version`, `node -v` (must be 22.18 or newer) and, if rekordbox is on, `python3 --version` (`db` mode needs it; `xml` mode needs it only to copy rekordbox playlists to the other apps).
 2. If something is missing, show the user the matching commands from the README section "Before you start" (`xcode-select --install` for git and Python 3, the Node installer from https://nodejs.org or `brew install node`) and run them only after the user says yes. `xcode-select --install` opens a window the user must click Install in and takes 5 to 10 minutes. After installing Node, re-check `node -v` in a new shell.
 3. Ask, in plain language: which music folder(s) hold their music (each folder inside becomes a playlist); whether to write to Apple Music; whether to write to Traktor; which rekordbox mode (`xml`: writes a file they import in rekordbox, nothing touches their library, the safe choice; `db`: writes rekordbox's own database directly while rekordbox is closed, so playlists just appear, but it is unofficial and could damage their library; `off`: leave rekordbox alone); and how often to check (minutes, default 30).
 4. For `db`, first show the user the warning from the README ("rekordbox: choose how it writes") and get an explicit yes. Only then pass `--accept-db-risk`. Never pass it on your own.
@@ -41,6 +42,7 @@ When a user asks you to set up playlist-sync, do it in this order. The users are
 ```bash
 node src/cli.ts auto --dry-run       # what the next tick would do
 node src/cli.ts folders --apply      # write now (after the dry run, apps closed)
+node src/cli.ts mirrors              # the From folders, dry run
 node src/cli.ts status
 node src/cli.ts config-check
 ```
