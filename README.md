@@ -6,11 +6,11 @@ You buy a track and save it to a folder, like you always have. You don't import 
 
 * Your folders are your playlists. Pick any music folder — one or several, anywhere on your Mac. Every folder inside it becomes a playlist with the same name in rekordbox, Apple Music and Traktor. Make a new folder and you get a new playlist.
 * It runs every 30 minutes and when you log in. It checks your folders for anything new, and when there is something, it updates all your apps at once.
-* It waits until you're finished. It never changes an app's library while you're using that app. If rekordbox or Music is open, it waits and checks again in 30 minutes. Once both are closed, every app gets the update in one pass, so they always match.
+* It waits until you're finished. It never changes an app's library while you're using that app. If rekordbox, Music or Traktor is open, it waits and checks again in 30 minutes. Once they're closed, every app gets the update in one pass, so they always match.
 * It's safe. It backs up each app's library before writing, only adds or rebuilds playlists, and never deletes a song file.
 * Playlists move between apps too. A playlist you make in rekordbox shows up in Music and Traktor under From rekordbox. Each app gets that copy as soon as it alone is closed, without waiting for the others. *(Coming in the next release — v1 syncs folders → apps.)*
 
-Your part: save music to the folders, and quit rekordbox and Music when you're done. The sync does the rest.
+Your part: save music to the folders, and quit rekordbox, Music and Traktor when you're done. The sync does the rest.
 
 The folders can be anywhere on the Mac (a synced cloud folder, iCloud Drive, an external drive). You choose them at install and can change them any time in `~/.config/playlist-sync/config.json`.
 
