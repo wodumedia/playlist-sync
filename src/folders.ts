@@ -33,7 +33,7 @@ export interface FolderEntry {
 
 export interface FolderPlaylistsInput {
   dir: string;
-  /** The playlist folder in the apps (e.g. `Download MP3s`). */
+  /** The playlist folder in the apps (e.g. `DJ`). */
   folderName: string;
   entries: FolderEntry[];
   index: LibraryIndex | null;

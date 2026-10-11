@@ -22,7 +22,7 @@ import {
 
 const files = [
   {
-    folder: 'Download MP3s',
+    folder: 'DJ',
     playlists: [
       { name: 'A', tracks: [{ path: '/a/1.mp3', content_id: '' }] },
       { name: 'B', tracks: [{ path: '/b/1.mp3', content_id: '7' }] },
@@ -187,7 +187,7 @@ describe('log', () => {
     expect(
       foldersAppliedText([
         {
-          folder: 'Download MP3s',
+          folder: 'DJ',
           playlists: 128,
           tracks: 7262,
           results: [
@@ -198,7 +198,7 @@ describe('log', () => {
         },
       ]),
     ).toBe(
-      'Download MP3s 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157 missing, 3 added to the collection; music 7,262; traktor failed: boom)',
+      'DJ 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157 missing, 3 added to the collection; music 7,262; traktor failed: boom)',
     );
   });
 });

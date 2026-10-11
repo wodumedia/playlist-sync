@@ -1,10 +1,10 @@
 # Drop it in a folder. It's in every app.
 
-You buy a track and save it to a Dropbox folder, like you always have. You don't import anything or drag it into playlists by hand.
+You buy a track and save it to a folder, like you always have. You don't import anything or drag it into playlists by hand.
 
 ## How it works
 
-* Your folders are your playlists. Every folder in `Download MP3s` and `Download Albums` becomes a playlist with the same name in rekordbox, Apple Music and Traktor. Make a new folder and you get a new playlist.
+* Your folders are your playlists. Pick any music folder — one or several, anywhere on your Mac. Every folder inside it becomes a playlist with the same name in rekordbox, Apple Music and Traktor. Make a new folder and you get a new playlist.
 * It runs every 30 minutes and when you log in. It checks your folders for anything new, and when there is something, it updates all your apps at once.
 * It waits until you're finished. It never changes an app's library while you're using that app. If rekordbox or Music is open, it waits and checks again in 30 minutes. Once both are closed, every app gets the update in one pass, so they always match.
 * It's safe. It backs up each app's library before writing, only adds or rebuilds playlists, and never deletes a song file.
@@ -12,7 +12,7 @@ You buy a track and save it to a Dropbox folder, like you always have. You don't
 
 Your part: save music to the folders, and quit rekordbox and Music when you're done. The sync does the rest.
 
-The folders can be anywhere on the Mac (a synced cloud folder, iCloud Drive, an external drive). `Download MP3s` and `Download Albums` are just the author's names; you choose yours at install.
+The folders can be anywhere on the Mac (a synced cloud folder, iCloud Drive, an external drive). You choose them at install and can change them any time in `~/.config/playlist-sync/config.json`.
 
 ## Install
 
@@ -36,7 +36,7 @@ The config looks like this:
 
 ```json
 {
-  "folders": ["~/Music/Download MP3s", "~/Music/Download Albums"],
+  "folders": ["~/Music/DJ"],
   "apps": {
     "rekordbox": "off",
     "music": true,

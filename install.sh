@@ -13,8 +13,6 @@
 set -euo pipefail
 
 LABEL="com.wodumedia.playlist-sync"
-DEFAULT_FOLDER_1="~/Music/Download MP3s"
-DEFAULT_FOLDER_2="~/Music/Download Albums"
 DEFAULT_TRAKTOR="/Users/Shared/Native Instruments/Traktor Pro 3/collection.nml"
 DEFAULT_STAGING="~/Library/Application Support/playlist-sync"
 DEFAULT_INTERVAL="30"
@@ -159,7 +157,6 @@ ask_questions() {
   step "Your music folders"
   say "Every folder directly inside a music folder becomes a playlist."
   say "Enter one music folder per line. Press Return on an empty line when you are done."
-  say "(Press Return straight away to use: $DEFAULT_FOLDER_1 and $DEFAULT_FOLDER_2)"
 
   FOLDERS=""
   FOLDER_COUNT=0
@@ -170,20 +167,7 @@ ask_questions() {
       if [ "$FOLDER_COUNT" -gt 0 ]; then
         break
       fi
-      # Nothing typed yet: offer the defaults, but only if both exist.
-      defaults_ok="yes"
-      for candidate in "$DEFAULT_FOLDER_1" "$DEFAULT_FOLDER_2"; do
-        if [ ! -d "$(expand_tilde "$candidate")" ]; then
-          warn "The folder $candidate does not exist."
-          defaults_ok="no"
-        fi
-      done
-      if [ "$defaults_ok" = "yes" ]; then
-        FOLDERS="$DEFAULT_FOLDER_1"$'\n'"$DEFAULT_FOLDER_2"
-        FOLDER_COUNT=2
-        break
-      fi
-      say "Please type the folder(s) you want to use, one per line."
+      say "Please type at least one folder, one per line."
       continue
     fi
     entry="$(clean_path "$entry")"

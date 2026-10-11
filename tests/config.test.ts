@@ -8,7 +8,7 @@ import { blockingApps } from '../src/running.ts';
 
 const HOME = '/Users/someone';
 const example = {
-  folders: ['~/Music/Download MP3s', '~/Music/Download Albums'],
+  folders: ['~/Music/DJ', '~/Music/Extras'],
   apps: {
     rekordbox: 'off',
     music: true,
@@ -21,7 +21,7 @@ const example = {
 describe('config', () => {
   it('a valid config: ~ expanded everywhere, fixed library paths', () => {
     const c = parseConfig(example, '/c.json', HOME);
-    expect(c.folders).toEqual([`${HOME}/Music/Download MP3s`, `${HOME}/Music/Download Albums`]);
+    expect(c.folders).toEqual([`${HOME}/Music/DJ`, `${HOME}/Music/Extras`]);
     expect(c.stagingDir).toBe(`${HOME}/Library/Application Support/playlist-sync`);
     expect(c.rekordbox).toBe('off');
     expect(c.music).toBe(true);

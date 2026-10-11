@@ -11,7 +11,7 @@ import {
 } from '../src/folders.ts';
 import { type LibraryIndex, LibraryIndexSchema, PlaylistsFileSchema } from '../src/library.ts';
 
-const D = '/Users/someone/Music/Download MP3s';
+const D = '/Users/someone/Music/DJ';
 const dir = (rel: string): FolderEntry => ({ path: `${D}/${rel}`, isDir: true });
 const file = (rel: string, realPath?: string): FolderEntry => ({
   path: `${D}/${rel}`,
@@ -39,7 +39,7 @@ const index: LibraryIndex = LibraryIndexSchema.parse({
 function build(entries: FolderEntry[], idx: LibraryIndex | null = index) {
   return buildFolderPlaylists({
     dir: D,
-    folderName: 'Download MP3s',
+    folderName: 'DJ',
     entries,
     index: idx,
     bootVolume: 'Macintosh HD',
@@ -92,7 +92,7 @@ describe('buildFolderPlaylists', () => {
       inIndex: 1,
       notInIndex: 7,
     });
-    expect(f.folder).toBe('Download MP3s');
+    expect(f.folder).toBe('DJ');
   });
 
   it('skips empty folders, hidden files and folders, non-audio files and files directly in the directory', () => {

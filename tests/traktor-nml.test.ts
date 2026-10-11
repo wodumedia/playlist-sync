@@ -31,7 +31,7 @@ const FILE: PlaylistsFile = {
   version: 1,
   generated_at: '2026-10-07T00:00:00Z',
   index_generated_at: null,
-  folder: 'Download MP3s',
+  folder: 'DJ',
   playlists: [
     {
       slug: 'one',
@@ -73,7 +73,7 @@ describe('spliceTraktorCollection', () => {
 
   it('is byte-identical outside the spliced spots', () => {
     const r = spliceTraktorCollection(NML, FILE);
-    const folderAt = r.nml.indexOf('<NODE TYPE="FOLDER" NAME="Download MP3s">');
+    const folderAt = r.nml.indexOf('<NODE TYPE="FOLDER" NAME="DJ">');
     const folderEnd = r.nml.indexOf('</SUBNODES></NODE></PLAYLISTS>');
     const addedAt = r.nml.indexOf('<ENTRY TITLE="New');
     const addedEnd = r.nml.indexOf('</COLLECTION>');
@@ -94,18 +94,18 @@ describe('spliceTraktorCollection', () => {
     expect(third.replacedFolder).toBe(true);
     expect(third.nml).toContain('<SUBNODES COUNT="2"><NODE TYPE="PLAYLIST" NAME="Old crate">');
     expect(third.nml).not.toContain('2021 · Two');
-    expect(third.nml.match(/NAME="Download MP3s"/g)).toHaveLength(1);
+    expect(third.nml.match(/NAME="DJ"/g)).toHaveLength(1);
     expect(third.nml).toContain('<COLLECTION ENTRIES="5">');
   });
 
   it('ignores a same-named folder nested deeper than $ROOT', () => {
     const nested = NML.replace(
       '<NODE TYPE="PLAYLIST" NAME="Old crate">',
-      '<NODE TYPE="FOLDER" NAME="Sub"><SUBNODES COUNT="1"><NODE TYPE="FOLDER" NAME="Download MP3s"><SUBNODES COUNT="0"></SUBNODES></NODE></SUBNODES></NODE><NODE TYPE="PLAYLIST" NAME="Old crate">',
+      '<NODE TYPE="FOLDER" NAME="Sub"><SUBNODES COUNT="1"><NODE TYPE="FOLDER" NAME="DJ"><SUBNODES COUNT="0"></SUBNODES></NODE></SUBNODES></NODE><NODE TYPE="PLAYLIST" NAME="Old crate">',
     );
     const r = spliceTraktorCollection(nested, FILE);
     expect(r.replacedFolder).toBe(false);
-    expect(r.nml.match(/NAME="Download MP3s"/g)).toHaveLength(2);
+    expect(r.nml.match(/NAME="DJ"/g)).toHaveLength(2);
   });
 
   it('throws clearly without <PLAYLISTS>', () => {

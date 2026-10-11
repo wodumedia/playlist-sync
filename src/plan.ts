@@ -251,8 +251,8 @@ export interface FoldersAppliedDir {
 
 const n = (x: number) => x.toLocaleString('en-US');
 
-/** The log text after a folders apply: "Download MP3s 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157
- * missing; music 7,262), Download Albums …". A failed or skipped app shows its action instead of counts. */
+/** The log text after a folders apply: "DJ 128 playlists/7,262 tracks (rekordbox 6,105 linked, 1,157
+ * missing; music 7,262), Extras …". A failed or skipped app shows its action instead of counts. */
 export function foldersAppliedText(dirs: FoldersAppliedDir[]): string {
   return dirs
     .map((d) => {
