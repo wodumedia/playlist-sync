@@ -120,4 +120,4 @@ Set up https://github.com/wodumedia/playlist-sync for my library: read README.md
 
 ## Credits
 
-Built by Peter Downie — DJ Peter Worth — and Wodu Media (https://wodu.com). Free, MIT licence. Not affiliated with Pioneer DJ/AlphaTheta, Apple or Native Instruments.
+Built for [DJ Peter Worth](https://www.djpeterworth.com) @ [Wodu](https://wodu.com). Free, MIT licence. Not affiliated with Pioneer DJ/AlphaTheta, Apple, or Native Instruments.
