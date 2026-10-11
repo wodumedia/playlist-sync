@@ -3,9 +3,15 @@ import { execFileSync } from 'node:child_process';
 import type { RekordboxMode } from './config.ts';
 import type { LiveApp } from './plan.ts';
 
+/** pgrep arguments: rekordbox and Music in THIS account only (`-U <uid>`), so a copy open in another logged-in account
+ * (fast user switching) does not block this one's write. */
+export function pgrepArgs(app: string, uid: number | null): string[] {
+  return uid === null ? ['-x', app] : ['-x', '-U', String(uid), app];
+}
+
 export function running(app: string): boolean {
   try {
-    execFileSync('pgrep', ['-x', app], { stdio: 'ignore' });
+    execFileSync('pgrep', pgrepArgs(app, process.getuid?.() ?? null), { stdio: 'ignore' });
     return true;
   } catch {
     return false;

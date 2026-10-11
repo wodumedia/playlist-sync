@@ -12,7 +12,7 @@ import {
   loadConfig,
   parseConfig,
 } from '../src/config.ts';
-import { blockingApps } from '../src/running.ts';
+import { blockingApps, pgrepArgs } from '../src/running.ts';
 
 const HOME = '/Users/someone';
 const example = {
@@ -132,5 +132,13 @@ describe('apps', () => {
     expect(blockingApps(['rekordbox', 'traktor'], 'xml', open)).toEqual(['Traktor']);
     expect(blockingApps(['rekordbox', 'music', 'traktor'], 'db', open)).toEqual(['rekordbox', 'Traktor', 'Music']);
     expect(blockingApps(['rekordbox', 'music'], 'db', { rekordbox: false, music: false, traktor: true })).toEqual([]);
+  });
+});
+
+describe('pgrepArgs', () => {
+  it('looks in this account only, so another logged-in user\'s Music does not block the write', () => {
+    expect(pgrepArgs('Music', 502)).toEqual(['-x', '-U', '502', 'Music']);
+    expect(pgrepArgs('rekordbox', 501)).toEqual(['-x', '-U', '501', 'rekordbox']);
+    expect(pgrepArgs('Music', null)).toEqual(['-x', 'Music']);
   });
 });
