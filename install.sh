@@ -513,7 +513,7 @@ mirrors_add() {
 
 q_mirrors() {
   step "Playlists between the apps"
-  say 'Your own playlists can be copied between the apps, each app'"'"'s in its own "From …" folder. See what it would write first with: node src/cli.ts mirrors'
+  say 'Your own playlists can be copied between the apps, each app'"'"'s in its own "From …" folder. The dry run at the end shows what each app would get.'
   for app in $MIRROR_TARGETS; do
     others=""
     for other in rekordbox music traktor; do
@@ -725,7 +725,8 @@ if [ "$KEEP_CONFIG" = "yes" ]; then
     if (m.music === true && a.music === true) on.push("Apple Music");
     if (m.traktor === true && a.traktor && a.traktor.enabled === true) on.push("Traktor");
     if (m.rekordbox === true && (a.rekordbox === "xml" || a.rekordbox === "db")) on.push("rekordbox");
-    return on.length > 1 ? on.join(", ") : ""; })()')"
+    const enabled = (a.music === true ? 1 : 0) + (a.traktor && a.traktor.enabled === true ? 1 : 0) + (a.rekordbox === "xml" || a.rekordbox === "db" ? 1 : 0);
+    return enabled >= 2 && on.length >= 1 ? on.join(", ") : ""; })()')"
   case "$INTERVAL" in
     ""|*[!0-9]*) die "intervalMinutes in $CONFIG_FILE is not a whole number." ;;
   esac

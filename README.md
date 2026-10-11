@@ -90,6 +90,7 @@ The config looks like this:
     "music": true,
     "traktor": { "enabled": false, "collection": "/Users/Shared/Native Instruments/Traktor Pro 3/collection.nml" }
   },
+  "mirrors": { "music": true, "traktor": true, "rekordbox": true },
   "stagingDir": "~/Library/Application Support/playlist-sync",
   "intervalMinutes": 30
 }
