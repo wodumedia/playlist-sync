@@ -190,4 +190,4 @@ launchctl kickstart gui/$(id -u)/com.wodumedia.playlist-sync
 
 ## Credits
 
-Built for [DJ Peter Worth](https://www.djpeterworth.com) @ [Wodu](https://wodu.com). Free, MIT licence. Not affiliated with Pioneer DJ/AlphaTheta, Apple, or Native Instruments.
+Built for [DJ Peter Worth](https://www.djpeterworth.com) @ [Wodu.](https://wodu.com) Free, MIT licence. Not affiliated with Pioneer DJ/AlphaTheta, Apple, or Native Instruments.
