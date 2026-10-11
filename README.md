@@ -1,9 +1,6 @@
 # Playlist Sync. Drop it in a folder. It's in every app.
 
-Keep Apple Music, rekordbox and Traktor in sync.
-
-## What it is
-
+Keep your Apple Music, rekordbox and Traktor databases in sync automatically.
 1. You download a track and save it to a folder, like you always have.
 3. You don't import anything or drag it into playlists by hand.
 4. Playlists are created automatically in Apple Music, rekordbox and Traktor, and kept up to date.
