@@ -1,4 +1,4 @@
-# Drop it in a folder. It's in every app.
+# Playlist Sync. Drop it in a folder. It's in every app.
 
 You buy a track and save it to a folder, like you always have. You don't import anything or drag it into playlists by hand. Playlists are created automatically in Apple Music, rekordbox and Traktor, and kept up to date. Coming next: a playlist you make in any one app shows up in the other two.
 
