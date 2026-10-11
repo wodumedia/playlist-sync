@@ -19,6 +19,25 @@ Your part: save music to the folders, and quit rekordbox, Music and Traktor when
 
 The folders can be anywhere on the Mac (a synced cloud folder, iCloud Drive, an external drive). You choose them at install and can change them any time in `~/.config/playlist-sync/config.json`.
 
+## Set up with Claude Code
+
+The quickest way. You need [Claude Code](https://claude.com/claude-code) installed. Paste this into it:
+
+```
+Set up https://github.com/wodumedia/playlist-sync for my library: read README.md and CLAUDE.md, ask me which folders and apps I use, run install.sh, then show me the dry run.
+```
+
+Claude reads this README and `CLAUDE.md`, checks what your Mac has, asks which folders and apps you use, runs the installer with your answers (`install.sh` takes them as options, so Claude does not need to type into a Terminal window) and shows you the dry run.
+
+**What Claude cannot do for you.** A few steps open a window only you can click, and Claude will tell you when:
+
+* **Apple's Command Line Tools** (git and Python 3). `xcode-select --install` opens a window; you click **Install** and wait 5 to 10 minutes.
+* **Node 22 or newer**, if your Mac does not have it. Claude offers `brew install node` and runs it only after you say yes, or points you to the installer at [nodejs.org](https://nodejs.org), which you click through.
+* **Apple Music's two settings** (below under "Apple Music"): turning off "Copy files to Music Media folder", and allowing `node` to control Music when macOS asks.
+* **rekordbox `db` mode.** Claude shows you the warning and does nothing until you say yes.
+
+Prefer to do it by hand? The next section is the same install step by step.
+
 ## Install
 
 ### Before you start
@@ -138,14 +157,6 @@ The log is `<stagingDir>/playlist-sync.log` (the agent's own output: `<stagingDi
 
 ```bash
 launchctl kickstart gui/$(id -u)/com.wodumedia.playlist-sync
-```
-
-## Set up with Claude Code
-
-You need [Claude Code](https://claude.com/claude-code) installed. Paste this and Claude checks the prerequisites (installing Node with your permission if needed), asks which folders and apps you use, runs the installer with your answers, and shows you the dry run.
-
-```
-Set up https://github.com/wodumedia/playlist-sync for my library: read README.md and CLAUDE.md, ask me which folders and apps I use, run install.sh, then show me the dry run.
 ```
 
 ## Credits
