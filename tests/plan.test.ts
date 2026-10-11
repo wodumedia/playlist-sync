@@ -12,6 +12,9 @@ import {
   decideMirrors,
   freshAutoState,
   mirrorsAppliedText,
+  mirrorsEnabled,
+  mirrorsSource,
+  mirrorsStatusText,
   parseMirrorsArgs,
   foldersAppliedText,
   foldersHash,
@@ -276,6 +279,56 @@ describe('playlist mirrors', () => {
     expect(decideMirrors(on, 'music', 'h2', [])).toEqual({ action: 'apply' });
     // Only the app itself blocks: another app being open is not passed in, so it applies.
     expect(decideMirrors(st({ mirror_apps: ['traktor'] }), 'traktor', 'h', [])).toEqual({ action: 'apply' });
+  });
+
+  it('mirrorsEnabled: on from the config or from a mirrors --apply (state), off when neither', () => {
+    const cfg = (m: object) => ({ mirrors: m });
+    const st = (apps: ('rekordbox' | 'music' | 'traktor')[]) => ({ mirror_apps: apps });
+    expect(mirrorsEnabled(cfg({ music: true }), st([]), 'music')).toBe(true);
+    expect(mirrorsSource(cfg({ music: true }), st([]), 'music')).toBe('config');
+    expect(mirrorsEnabled(cfg({}), st(['traktor']), 'traktor')).toBe(true);
+    expect(mirrorsSource(cfg({}), st(['traktor']), 'traktor')).toBe('mirrors --apply');
+    // Both: the config is named. false in the config does not undo a mirrors --apply (state.json mirror_apps does).
+    expect(mirrorsSource(cfg({ traktor: true }), st(['traktor']), 'traktor')).toBe('config');
+    expect(mirrorsEnabled(cfg({ traktor: false }), st(['traktor']), 'traktor')).toBe(true);
+    expect(mirrorsEnabled(cfg({}), st([]), 'rekordbox')).toBe(false);
+    expect(mirrorsEnabled(cfg({ rekordbox: false, music: true }), st(['music']), 'rekordbox')).toBe(false);
+    expect(mirrorsSource(cfg({}), st([]), 'rekordbox')).toBe(null);
+  });
+
+  it('decideMirrors: an app on in the config and never written applies when closed, waits when open', () => {
+    const st = (over = {}) => ({ ...freshAutoState(), ...over });
+    const config = { mirrors: { music: true, rekordbox: true } };
+    expect(decideMirrors(st(), 'music', 'h1', [], config)).toEqual({ action: 'apply' });
+    expect(decideMirrors(st(), 'music', 'h1', ['Music'], config)).toEqual({ action: 'waiting', waitingOn: ['Music'] });
+    // rekordbox in xml mode: blockingApps gives nothing, so it applies (into rekordbox.xml) on the next tick.
+    expect(decideMirrors(st(), 'rekordbox', 'h1', [], config)).toEqual({ action: 'apply' });
+    // Written once: unchanged until the hash moves.
+    expect(decideMirrors(st({ last_mirrors_hash: { music: 'h1' } }), 'music', 'h1', ['Music'], config)).toEqual({
+      action: 'unchanged',
+    });
+    // Not in the config (nor in state): the not-enabled hint, as before.
+    expect(decideMirrors(st(), 'traktor', 'h1', [], config)).toEqual({ action: 'not-enabled', note: true });
+    expect(decideMirrors(st(), 'music', 'h1', [], { mirrors: { music: false } })).toEqual({
+      action: 'not-enabled',
+      note: true,
+    });
+  });
+
+  it('mirrorsStatusText: the apps on and where from, or off', () => {
+    const all = ['rekordbox', 'music', 'traktor'] as const;
+    expect(mirrorsStatusText({ mirrors: { music: true, traktor: true } }, { mirror_apps: [] }, [...all])).toBe(
+      'on: music, traktor (config)',
+    );
+    expect(mirrorsStatusText({ mirrors: {} }, { mirror_apps: ['music'] }, [...all])).toBe('on: music (mirrors --apply)');
+    expect(mirrorsStatusText({ mirrors: { music: true } }, { mirror_apps: ['rekordbox'] }, [...all])).toBe(
+      'on: music (config); rekordbox (mirrors --apply)',
+    );
+    // Only the enabled apps count.
+    expect(mirrorsStatusText({ mirrors: { traktor: true } }, { mirror_apps: [] }, ['music'])).toMatch(/^off \(/);
+    expect(mirrorsStatusText({ mirrors: {} }, { mirror_apps: [] }, [...all])).toBe(
+      'off (set "mirrors" in the config, or run mirrors --apply --<app>)',
+    );
   });
 
   it('mirrorsAppliedText: counts per folder and the writer result', () => {

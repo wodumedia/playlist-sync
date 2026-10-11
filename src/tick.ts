@@ -5,9 +5,9 @@
  * app means "waiting": nothing is written, the next tick tries again. Music is checked for copy-on-add before its
  * first write.
  *
- * Then the playlist mirrors: every enabled app's own playlists are read (`collect-run.ts`) and each app enabled with
- * `mirrors --apply --<app>` gets the other apps' playlists in `From …` folders, hashed per app and written as soon as
- * that app alone is closed.
+ * Then the playlist mirrors: every enabled app's own playlists are read (`collect-run.ts`) and each app with mirrors on
+ * (`mirrors.<app>: true` in the config, or a `mirrors --apply --<app>`) gets the other apps' playlists in `From …`
+ * folders, hashed per app and written as soon as that app alone is closed.
  */
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -46,6 +46,7 @@ import {
   logLine,
   type MirrorsAppliedItem,
   mirrorsAppliedText,
+  mirrorsEnabled,
   musicCheckDue,
   parseAutoArgs,
   parseAutoState,
@@ -146,7 +147,7 @@ export function mirrorsHash(config: Config, app: LiveApp, built: MirrorOutput[])
 
 /** The rekordbox mirror files that go into rekordbox.xml beside the folders (xml mode, rekordbox enabled for mirrors). */
 function xmlMirrorFiles(config: Config, state: AutoState, source: MirrorSource | null): PlaylistsFile[] {
-  if (config.rekordbox !== 'xml' || !source || !state.mirror_apps.includes('rekordbox')) return [];
+  if (config.rekordbox !== 'xml' || !source || !mirrorsEnabled(config, state, 'rekordbox')) return [];
   return mirrorsFor(config, source, 'rekordbox').map((m) => m.file);
 }
 
@@ -179,8 +180,9 @@ function printMirror(app: LiveApp, m: MirrorOutput): void {
 }
 
 /**
- * The tick's mirrors step: per active app, hashed every tick; written only for an app in `state.mirror_apps`, when
- * that app alone is closed (rekordbox in `xml` mode never waits). Returns whether some app's mirrors changed.
+ * The tick's mirrors step: per active app, hashed every tick; written only for an app with mirrors on (config or
+ * `state.mirror_apps`, see `mirrorsEnabled`), when that app alone is closed (rekordbox in `xml` mode never waits).
+ * Returns whether some app's mirrors changed.
  */
 function autoMirrors(
   config: Config,
@@ -206,9 +208,9 @@ function autoMirrors(
   for (const app of active) {
     const built = mirrorsFor(config, source, app);
     const hash = mirrorsHash(config, app, built);
-    const plan = decideMirrors(state, app, hash, blockingApps([app], config.rekordbox, open));
+    const plan = decideMirrors(state, app, hash, blockingApps([app], config.rekordbox, open), config);
     if (plan.action === 'unchanged') {
-      if (state.mirror_apps.includes(app)) unchanged.push(app);
+      if (mirrorsEnabled(config, state, app)) unchanged.push(app);
       continue;
     }
     if (plan.action === 'not-enabled') {
@@ -478,7 +480,7 @@ export async function foldersCommand(config: Config, args: string[]): Promise<vo
       // rekordbox.xml is one file: it keeps the `From …` folders when rekordbox is enabled for mirrors.
       const state = readState(config);
       let mirrorFiles: PlaylistsFile[] = [];
-      if (state.mirror_apps.includes('rekordbox')) {
+      if (mirrorsEnabled(config, state, 'rekordbox')) {
         console.log("reading the other apps' playlists for the From folders in rekordbox.xml");
         mirrorFiles = xmlMirrorFiles(config, state, readMirrorSource(config));
       }

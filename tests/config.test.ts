@@ -3,7 +3,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { activeApps, appKeys, enabledApps } from '../src/apply.ts';
-import { ConfigError, configPath, DEFAULT_TRAKTOR, expandHome, loadConfig, parseConfig } from '../src/config.ts';
+import {
+  ConfigError,
+  ConfigSchema,
+  configPath,
+  DEFAULT_TRAKTOR,
+  expandHome,
+  loadConfig,
+  parseConfig,
+} from '../src/config.ts';
 import { blockingApps } from '../src/running.ts';
 
 const HOME = '/Users/someone';
@@ -48,6 +56,18 @@ describe('config', () => {
     expect(() => parseConfig({ ...example, folders: ['/a/Mix', '/b/Mix'] }, '/c.json', HOME)).toThrow(
       /both be the playlist folder "Mix"/,
     );
+  });
+
+  it('mirrors: optional, missing = {} (all off), a partial object fills in false, a wrong type is rejected', () => {
+    expect(ConfigSchema.parse(example).mirrors).toEqual({});
+    expect(parseConfig(example, '/c.json', HOME).mirrors).toEqual({ rekordbox: false, music: false, traktor: false });
+    const partial = { ...example, mirrors: { music: true } };
+    expect(ConfigSchema.parse(partial).mirrors).toEqual({ music: true });
+    expect(parseConfig(partial, '/c.json', HOME).mirrors).toEqual({ rekordbox: false, music: true, traktor: false });
+    const all = { ...example, mirrors: { music: true, traktor: false, rekordbox: true } };
+    expect(parseConfig(all, '/c.json', HOME).mirrors).toEqual({ rekordbox: true, music: true, traktor: false });
+    expect(() => parseConfig({ ...example, mirrors: { music: 'yes' } }, '/c.json', HOME)).toThrow(/mirrors\.music/);
+    expect(() => parseConfig({ ...example, mirrors: true }, '/c.json', HOME)).toThrow(/mirrors/);
   });
 
   it('expandHome only touches a leading ~', () => {

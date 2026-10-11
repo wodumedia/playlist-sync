@@ -45,11 +45,12 @@ export interface AutoState {
   music_copy_check: 'passed' | null;
   /** When the check last found Music copying (ISO): the tick re-checks only once this is 24 h old. */
   music_copy_check_refused_at: string | null;
-  /** The apps the tick writes the `From …` folders into: added by a successful `mirrors --apply --<app>`. */
+  /** Apps turned on by a successful `mirrors --apply --<app>` (the config's `mirrors` turns them on too: see
+   * `mirrorsEnabled`). */
   mirror_apps: LiveApp[];
   /** Per app: the mirrors hash at that app's last successful mirrors write. */
   last_mirrors_hash: Record<string, string>;
-  /** Per app not in `mirror_apps`: the hash the tick last logged the "not enabled" hint for (one line per change). */
+  /** Per app with mirrors off: the hash the tick last logged the "not enabled" hint for (one line per change). */
   mirrors_noted_hash: Record<string, string>;
 }
 
@@ -282,6 +283,42 @@ export function parseMirrorsArgs(args: string[]): MirrorsArgs {
   return { apply, apps: picked.size ? LIVE_APPS.filter((x) => picked.has(x)) : null, traktorCollection, noProbe };
 }
 
+/** Where an app's mirrors were turned on: `mirrors.<app>: true` in the config, or a `mirrors --apply` (state). */
+export type MirrorsSource = 'config' | 'mirrors --apply';
+
+/** Why the tick writes `app`'s `From …` folders: the config wins when both turned it on; null = off. */
+export function mirrorsSource(
+  config: { mirrors: Partial<Record<LiveApp, boolean>> },
+  state: Pick<AutoState, 'mirror_apps'>,
+  app: LiveApp,
+): MirrorsSource | null {
+  if (config.mirrors[app] === true) return 'config';
+  return state.mirror_apps.includes(app) ? 'mirrors --apply' : null;
+}
+
+/** Whether the tick writes `app`'s `From …` folders: `mirrors.<app>: true` in the config OR a `mirrors --apply`. */
+export function mirrorsEnabled(
+  config: { mirrors: Partial<Record<LiveApp, boolean>> },
+  state: Pick<AutoState, 'mirror_apps'>,
+  app: LiveApp,
+): boolean {
+  return mirrorsSource(config, state, app) !== null;
+}
+
+/** The `status` line for the mirrors of the enabled apps: "on: music, traktor (config)", "on: music (config);
+ * rekordbox (mirrors --apply)", or "off (…)". */
+export function mirrorsStatusText(
+  config: { mirrors: Partial<Record<LiveApp, boolean>> },
+  state: Pick<AutoState, 'mirror_apps'>,
+  apps: LiveApp[],
+): string {
+  const parts = (['config', 'mirrors --apply'] as const)
+    .map((src) => [src, apps.filter((a) => mirrorsSource(config, state, a) === src)] as const)
+    .filter(([, list]) => list.length)
+    .map(([src, list]) => `${list.join(', ')} (${src})`);
+  return parts.length ? `on: ${parts.join('; ')}` : 'off (set "mirrors" in the config, or run mirrors --apply --<app>)';
+}
+
 export type MirrorsPlan =
   | { action: 'unchanged' }
   /** Not enabled for this app: `note` = log the "not enabled" hint (once per change). */
@@ -290,14 +327,15 @@ export type MirrorsPlan =
   | { action: 'apply' };
 
 /** The tick's decision for one app's mirrors. `blocking` = the open apps that block writing this app (only the app
- * itself: each app gets its copy as soon as it alone is closed). */
+ * itself: each app gets its copy as soon as it alone is closed). On when `mirrorsEnabled` (config or state). */
 export function decideMirrors(
   state: Pick<AutoState, 'mirror_apps' | 'last_mirrors_hash' | 'mirrors_noted_hash'>,
   app: LiveApp,
   hash: string,
   blocking: string[],
+  config: { mirrors: Partial<Record<LiveApp, boolean>> } = { mirrors: {} },
 ): MirrorsPlan {
-  if (!state.mirror_apps.includes(app)) {
+  if (!mirrorsEnabled(config, state, app)) {
     if ((state.last_mirrors_hash[app] ?? null) === hash) return { action: 'unchanged' };
     return { action: 'not-enabled', note: (state.mirrors_noted_hash[app] ?? null) !== hash };
   }

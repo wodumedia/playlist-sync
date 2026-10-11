@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { ConfigError, type Config, configPath, configWarnings, loadConfig } from './config.ts';
 import { activeApps, enabledApps } from './apply.ts';
 import { indexCommand } from './index.ts';
+import { mirrorsStatusText } from './plan.ts';
 import { openApps } from './running.ts';
 import { auto, foldersCommand, lastLogLines, mirrorsCommand, readState, stagingPaths } from './tick.ts';
 
@@ -23,7 +24,8 @@ function usage(code: number): never {
       '                         the same by hand; dry run unless --apply; app flags pick among the enabled apps.',
       '  mirrors [--apply] [--rekordbox] [--music] [--traktor] [--traktor-collection <path>] [--no-probe]',
       '                         the other apps\' playlists as From rekordbox / From Music / From Traktor folders; dry',
-      '                         run unless --apply. --apply --<app> writes them now and enables them in the tick.',
+      '                         run unless --apply. --apply --<app> writes them now and enables them in the tick',
+      '                         (so does "mirrors": { "<app>": true } in the config).',
       '  status                 config, open apps, last tick state and the last 10 log lines',
       '  config-check           validate the config file',
       '  index                  dump rekordbox content ids to <staging>/index.json (optional)',
@@ -65,7 +67,7 @@ function status(c: Config): void {
   );
   console.log(`launchd agent        ${agentLoaded() ? 'loaded' : 'not loaded'} (${LABEL})`);
   const state = readState(c);
-  console.log(`mirrors              ${state.mirror_apps.length ? `on for ${state.mirror_apps.join(', ')}` : 'off (run mirrors --apply --<app>)'}`);
+  console.log(`mirrors              ${mirrorsStatusText(c, state, enabled)}`);
   console.log(`last tick            ${state.last_run ?? 'never'}`);
   if (state.last_result) console.log(`last result          ${state.last_result}`);
   const lines = lastLogLines(c, 10);

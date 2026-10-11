@@ -26,12 +26,26 @@ export const ConfigSchema = z.object({
       })
       .default({ enabled: false, collection: DEFAULT_TRAKTOR }),
   }),
+  /** Per app: write the other apps' playlists into it as `From …` folders (also turned on by `mirrors --apply`). */
+  mirrors: z
+    .object({
+      rekordbox: z.boolean().optional(),
+      music: z.boolean().optional(),
+      traktor: z.boolean().optional(),
+    })
+    .default({}),
   stagingDir: z.string().min(1).default(DEFAULT_STAGING),
   intervalMinutes: z.number().int().min(1).max(1440).default(30),
 });
 export type RawConfig = z.infer<typeof ConfigSchema>;
 
 export type RekordboxMode = 'off' | 'xml' | 'db';
+
+export interface MirrorsConfig {
+  rekordbox: boolean;
+  music: boolean;
+  traktor: boolean;
+}
 
 /** The config with every path expanded and the fixed locations of the apps' libraries. */
 export interface Config {
@@ -40,6 +54,8 @@ export interface Config {
   rekordbox: RekordboxMode;
   music: boolean;
   traktor: { enabled: boolean; collection: string };
+  /** The `mirrors` object, every app filled in (missing = false). */
+  mirrors: MirrorsConfig;
   stagingDir: string;
   intervalMinutes: number;
   rekordboxDb: string;
@@ -94,6 +110,11 @@ export function parseConfig(raw: unknown, path: string, home = homedir()): Confi
     rekordbox: c.apps.rekordbox,
     music: c.apps.music,
     traktor: { enabled: c.apps.traktor.enabled, collection: resolve(expandHome(c.apps.traktor.collection, home)) },
+    mirrors: {
+      rekordbox: c.mirrors.rekordbox === true,
+      music: c.mirrors.music === true,
+      traktor: c.mirrors.traktor === true,
+    },
     stagingDir: resolve(expandHome(c.stagingDir, home)),
     intervalMinutes: c.intervalMinutes,
     rekordboxDb: join(home, 'Library', 'Pioneer', 'rekordbox', 'master.db'),
