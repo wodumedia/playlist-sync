@@ -116,16 +116,19 @@ With no options, install.sh asks you each question. To answer up front instead
   --traktor yes|no           Write playlists to Traktor.
   --traktor-collection PATH  Where Traktor's collection.nml is (found automatically if left out).
   --rekordbox xml|db|off     How to write rekordbox (see the README).
-  --mirrors all|none|LIST    Copy each app's own playlists into the other apps, as "From …" folders.
-                             LIST names the apps that get them: music,traktor,rekordbox (comma list).
-                             Only asked when two or more apps are on. --yes alone means all.
+  --mirrors all|none|LIST    Copy each app's own playlists into the other apps,
+                             as "From …" folders. LIST names the apps that get
+                             them: music,traktor,rekordbox (comma list).
+                             Only asked when two or more apps are on.
+                             --yes alone means all.
   --interval MINUTES         Check for changes every N minutes, 1 to 1440.
   --keep-config              Use the settings file you already have and ask nothing.
   --accept-db-risk           Needed with --rekordbox db: you have read the README warning.
   --agent yes|no             Install the background job (default yes). "no" stops after the dry run.
-  --yes                      Answer yes to "Install the background job now?" and to the
-                             "From …" folders question (unless --mirrors is given), and skip
-                             the Apple Music "press Return" pause.
+  --yes                      Answer yes to "Install the background job now?" and
+                             to the "From …" folders question (unless --mirrors
+                             is given), and skip the Apple Music "press Return"
+                             pause.
   --help                     Show this text.
 
 When every answer comes from options (or --keep-config), nothing is read from the
@@ -299,7 +302,7 @@ if [ ! -t 0 ]; then
       if [ "$FLAG_TRAKTOR" = "yes" ]; then APPS_ON=$((APPS_ON + 1)); fi
       if [ "$FLAG_REKORDBOX" = "xml" ] || [ "$FLAG_REKORDBOX" = "db" ]; then APPS_ON=$((APPS_ON + 1)); fi
       if [ -z "$FLAG_MUSIC" ] || [ -z "$FLAG_TRAKTOR" ] || [ -z "$FLAG_REKORDBOX" ] || [ "$APPS_ON" -ge 2 ]; then
-        add_missing "--mirrors all|none|music,traktor,rekordbox (which apps get the other apps' playlists as \"From …\" folders; --yes means all)"
+        add_missing "--mirrors all|none|music,traktor,rekordbox (which apps get \"From …\" folders; --yes means all)"
       fi
     fi
   fi
@@ -513,7 +516,8 @@ mirrors_add() {
 
 q_mirrors() {
   step "Playlists between the apps"
-  say 'Your own playlists can be copied between the apps, each app'"'"'s in its own "From …" folder. The dry run at the end shows what each app would get.'
+  say "Your own playlists can be copied between the apps, each app's in its own"
+  say '"From …" folder. The dry run at the end shows what each app would get.'
   for app in $MIRROR_TARGETS; do
     others=""
     for other in rekordbox music traktor; do
@@ -523,11 +527,12 @@ q_mirrors() {
         esac
       fi
     done
-    extra=""
+    say ""
+    say "$(app_label "$app") can get the other apps' playlists ($others)."
     if [ "$app" = "rekordbox" ] && [ "$REKORDBOX_MODE" = "xml" ]; then
-      extra=" They go into rekordbox.xml too."
+      say "They go into rekordbox.xml with the folder playlists."
     fi
-    ask_yn "Also put the other apps' playlists into $(app_label "$app") (a $others folder)?$extra" "yes"
+    ask_yn "Copy them into $(app_label "$app")?" "yes"
     mirrors_add "$app" "$YN"
   done
 }
@@ -929,7 +934,11 @@ EOF
 if [ -n "$MIRRORS_ON_NAMES" ]; then
   cat <<EOF
 
-The other apps' playlists go into $MIRRORS_ON_NAMES: each gets its "From …" folders the first time that app is closed after the job runs.
-To turn one off, set it to false under "mirrors" in $CONFIG_FILE (if you ever ran mirrors --apply for it, also remove it from "mirror_apps" in $STAGING_ABS/state.json).
+The other apps' playlists go into: $MIRRORS_ON_NAMES
+  (as "From …" folders, the first time each app is closed after the job runs).
+To turn one off, set it to false under "mirrors" in
+  $CONFIG_FILE
+(if you ever ran mirrors --apply for it, also remove it from "mirror_apps" in
+  $STAGING_ABS/state.json).
 EOF
 fi
