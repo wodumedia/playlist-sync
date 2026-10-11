@@ -1,6 +1,6 @@
-# Drop it in a folder. It's in every app. Apple Music <-> Rekordbox <-> Traktor
+# Drop it in a folder. It's in every app. 
 
-You buy a track and save it to a folder, like you always have. You don't import anything or drag it into playlists by hand.
+You buy a track and save it to a folder, like you always have. You don't import anything or drag it into playlists by hand. Bidirectional syncing of playlists and tracks between Apple Music <-> rekordbox <-> Traktor.
 
 ## How it works
 
