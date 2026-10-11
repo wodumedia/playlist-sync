@@ -1,5 +1,4 @@
-# Drop it in a folder. It's in every app. 
-## Apple Music <-> Rekordbox <-> Traktor
+# Drop it in a folder. It's in every app. Apple Music <-> Rekordbox <-> Traktor
 
 You buy a track and save it to a folder, like you always have. You don't import anything or drag it into playlists by hand.
 
