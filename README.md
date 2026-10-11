@@ -21,7 +21,30 @@ The folders can be anywhere on the Mac (a synced cloud folder, iCloud Drive, an 
 
 ## Install
 
-macOS only. You need Node 22.18 or newer ([nodejs.org](https://nodejs.org) or `brew install node`). Python 3 is needed only for rekordbox `db` mode.
+### Before you start
+
+You need a Mac (macOS only) with three things. If you already have them, skip to **Install**.
+
+1. **Open Terminal.** Press Cmd+Space, type `Terminal`, press Return.
+2. **Apple's Command Line Tools** (this gives you `git` and Python 3). Paste this into Terminal and press Return:
+
+   ```bash
+   xcode-select --install
+   ```
+
+   Click **Install** in the window that opens and wait 5 to 10 minutes. If it says the tools are already installed, you are done with this step.
+3. **Node 22 or newer.** Either download the macOS installer from [nodejs.org](https://nodejs.org), open it and click through (the LTS version is fine if it is 22.18 or newer), or, if you use Homebrew, run `brew install node`.
+
+Then open a **new** Terminal window and check:
+
+```bash
+node -v
+git --version
+```
+
+`node -v` should print `v22.18.0` or higher. Python 3 is only needed for rekordbox `db` mode and comes with the Command Line Tools.
+
+### Install
 
 ```bash
 git clone https://github.com/wodumedia/playlist-sync.git && cd playlist-sync && ./install.sh
@@ -36,6 +59,8 @@ git clone https://github.com/wodumedia/playlist-sync.git && cd playlist-sync && 
 * how often to check, in minutes
 
 If `~/.config/playlist-sync/config.json` already exists it first asks whether to keep it (then it asks nothing else). It writes the config, shows you a dry run and the Apple Music steps, and only then asks to install the launchd agent `com.wodumedia.playlist-sync`, which runs at once, every N minutes and at login. To remove it: `./uninstall.sh` (it removes only the agent's plist; settings, logs and backups stay).
+
+Prefer to answer up front? `./install.sh --help` lists the flags; for example `./install.sh --folders ~/Music/DJ --music yes --traktor no --rekordbox xml --interval 30 --yes`.
 
 The config looks like this:
 
@@ -117,7 +142,7 @@ launchctl kickstart gui/$(id -u)/com.wodumedia.playlist-sync
 
 ## Set up with Claude Code
 
-Paste this into Claude Code:
+You need [Claude Code](https://claude.com/claude-code) installed. Paste this and Claude checks the prerequisites (installing Node with your permission if needed), asks which folders and apps you use, runs the installer with your answers, and shows you the dry run.
 
 ```
 Set up https://github.com/wodumedia/playlist-sync for my library: read README.md and CLAUDE.md, ask me which folders and apps I use, run install.sh, then show me the dry run.

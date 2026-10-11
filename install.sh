@@ -9,6 +9,10 @@
 # It is safe to run again: every answer can be changed by running it once more.
 #
 # It never deletes a song file, and it never touches your music libraries itself.
+#
+# Run it with no options and it asks you each question. To answer up front (for
+# a script, or for Claude Code, which cannot type into prompts), pass flags:
+# see ./install.sh --help.
 
 set -euo pipefail
 
@@ -85,13 +89,165 @@ ask_yn() {
   done
 }
 
+# Plain-English fixes for a missing prerequisite (for beginners).
+node_help() {
+  cat >&2 <<'EOF'
+How to fix it:
+  Install Node 22 or newer from https://nodejs.org (download the macOS installer, open it, click through),
+  then open a new Terminal window and run ./install.sh again.
+  If you use Homebrew you can run this instead: brew install node
+EOF
+}
+die_node() { printf '\nERROR: %s\n' "$*" >&2; node_help; exit 1; }
+
+# ---------------------------------------------------------------------------
+# Options: answer the questions up front (non-interactive mode)
+# ---------------------------------------------------------------------------
+
+usage() {
+  cat <<'EOF'
+Usage: ./install.sh [options]
+
+With no options, install.sh asks you each question. To answer up front instead
+(for a script, or for Claude Code), use these options:
+
+  --folders "<path>"         A music folder. Repeat the option, or separate paths with ":".
+  --music yes|no             Write playlists to Apple Music.
+  --traktor yes|no           Write playlists to Traktor.
+  --traktor-collection PATH  Where Traktor's collection.nml is (found automatically if left out).
+  --rekordbox xml|db|off     How to write rekordbox (see the README).
+  --interval MINUTES         Check for changes every N minutes, 1 to 1440.
+  --keep-config              Use the settings file you already have and ask nothing.
+  --accept-db-risk           Needed with --rekordbox db: you have read the README warning.
+  --agent yes|no             Install the background job (default yes). "no" stops after the dry run.
+  --yes                      Answer yes to "Install the background job now?" and skip the
+                             Apple Music "press Return" pause.
+  --help                     Show this text.
+
+When every answer comes from options (or --keep-config), nothing is read from the
+keyboard, so install.sh can run without a Terminal. If some answers are missing and
+there is no keyboard, it stops and lists exactly which options to add.
+
+If a settings file already exists and you give answers, your answers replace it.
+
+Example:
+  ./install.sh --folders ~/Music/DJ --music yes --traktor no --rekordbox xml --interval 30 --yes
+EOF
+}
+
+FLAG_FOLDERS_RAW=""
+FLAG_FOLDERS=""
+FLAG_MUSIC=""
+FLAG_TRAKTOR=""
+FLAG_TRAKTOR_COLLECTION=""
+FLAG_REKORDBOX=""
+FLAG_INTERVAL=""
+FLAG_KEEP="no"
+FLAG_ACCEPT_DB_RISK="no"
+FLAG_AGENT="yes"
+FLAG_YES="no"
+
+# parse_yn "--option" "value"  -> $YN_VALUE is "yes" or "no"
+parse_yn() {
+  local lower
+  lower="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    y|yes) YN_VALUE="yes" ;;
+    n|no)  YN_VALUE="no" ;;
+    *)     die "$1 must be yes or no (you gave \"$2\"). See ./install.sh --help" ;;
+  esac
+}
+
+while [ $# -gt 0 ]; do
+  OPT="$1"
+  shift
+  INLINE=""
+  HAS_INLINE="no"
+  case "$OPT" in
+    --*=*) INLINE="${OPT#*=}"; OPT="${OPT%%=*}"; HAS_INLINE="yes" ;;
+  esac
+  case "$OPT" in
+    --help|-h) usage; exit 0 ;;
+    --keep-config)    FLAG_KEEP="yes"; continue ;;
+    --accept-db-risk) FLAG_ACCEPT_DB_RISK="yes"; continue ;;
+    --yes)            FLAG_YES="yes"; continue ;;
+    --folders|--music|--traktor|--traktor-collection|--rekordbox|--interval|--agent)
+      if [ "$HAS_INLINE" = "yes" ]; then
+        VALUE="$INLINE"
+      elif [ $# -gt 0 ]; then
+        VALUE="$1"
+        shift
+      else
+        die "$OPT needs a value. See ./install.sh --help"
+      fi
+      ;;
+    *) die "Unknown option \"$OPT\". See ./install.sh --help" ;;
+  esac
+  case "$OPT" in
+    --folders)
+      [ -n "$VALUE" ] || die "--folders needs a folder path."
+      FLAG_FOLDERS_RAW="${FLAG_FOLDERS_RAW}${FLAG_FOLDERS_RAW:+$'\n'}$VALUE"
+      ;;
+    --music)  parse_yn "$OPT" "$VALUE"; FLAG_MUSIC="$YN_VALUE" ;;
+    --traktor) parse_yn "$OPT" "$VALUE"; FLAG_TRAKTOR="$YN_VALUE" ;;
+    --agent)  parse_yn "$OPT" "$VALUE"; FLAG_AGENT="$YN_VALUE" ;;
+    --traktor-collection)
+      [ -n "$VALUE" ] || die "--traktor-collection needs a file path."
+      FLAG_TRAKTOR_COLLECTION="$VALUE"
+      ;;
+    --rekordbox)
+      REK_LOWER="$(printf '%s' "$VALUE" | tr '[:upper:]' '[:lower:]')"
+      case "$REK_LOWER" in
+        xml|db|off) FLAG_REKORDBOX="$REK_LOWER" ;;
+        *) die "--rekordbox must be xml, db or off (you gave \"$VALUE\"). See ./install.sh --help" ;;
+      esac
+      ;;
+    --interval)
+      case "$VALUE" in
+        ""|*[!0-9]*) die "--interval must be a whole number of minutes from 1 to 1440 (you gave \"$VALUE\")." ;;
+      esac
+      if [ "$VALUE" -lt 1 ] || [ "$VALUE" -gt 1440 ]; then
+        die "--interval must be a number from 1 to 1440 (you gave \"$VALUE\")."
+      fi
+      FLAG_INTERVAL="$((10#$VALUE))"
+      ;;
+  esac
+done
+
+# The db-mode warning is never accepted silently.
+if [ "$FLAG_REKORDBOX" = "db" ] && [ "$FLAG_ACCEPT_DB_RISK" != "yes" ]; then
+  die "rekordbox \"db\" mode is unofficial. rekordbox's database is not documented, Cloud Library Sync has not been tested with it, and a bug could damage your library. A backup of the database is kept before every write (10 kept), but keep your own backup too. Use it at your own risk.
+If you understand this and want db mode, run install.sh again with --accept-db-risk. Otherwise use --rekordbox xml (safe) or --rekordbox off."
+fi
+
+# Every folder given must exist (the same check the questions make).
+if [ -n "$FLAG_FOLDERS_RAW" ]; then
+  while IFS= read -r part; do
+    [ -n "$part" ] || continue
+    part="$(clean_path "$part")"
+    [ -n "$part" ] || continue
+    if [ ! -d "$(expand_tilde "$part")" ]; then
+      die "\"$part\" is not a folder that exists. Check the path you gave to --folders."
+    fi
+    FLAG_FOLDERS="${FLAG_FOLDERS}${FLAG_FOLDERS:+$'\n'}$part"
+  done <<< "$(printf '%s\n' "$FLAG_FOLDERS_RAW" | tr ':' '\n')"
+  [ -n "$FLAG_FOLDERS" ] || die "--folders needs a folder path."
+fi
+
+HAVE_ANSWER_FLAGS="no"
+if [ -n "$FLAG_FOLDERS$FLAG_MUSIC$FLAG_TRAKTOR$FLAG_TRAKTOR_COLLECTION$FLAG_REKORDBOX$FLAG_INTERVAL" ]; then
+  HAVE_ANSWER_FLAGS="yes"
+fi
+if [ "$FLAG_KEEP" = "yes" ] && [ "$HAVE_ANSWER_FLAGS" = "yes" ]; then
+  die "--keep-config uses the settings you already have, so it cannot be combined with --folders, --music, --traktor, --rekordbox or --interval. Use one or the other."
+fi
+
 # ---------------------------------------------------------------------------
 # Step 0: are we in a sensible place?
 # ---------------------------------------------------------------------------
 
 [ "$(uname -s)" = "Darwin" ] || die "playlist-sync only runs on macOS."
 [ "$(id -u)" -ne 0 ] || die "Please run this as your normal user, not with sudo."
-[ -t 0 ] || die "install.sh asks questions, so it must be run from a Terminal window."
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="$HOME/.config/playlist-sync"
@@ -99,6 +255,31 @@ CONFIG_FILE="$CONFIG_DIR/config.json"
 PLIST_TEMPLATE="$REPO_DIR/templates/$LABEL.plist"
 PLIST_DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LAUNCH_TARGET="gui/$(id -u)/$LABEL"
+
+# Without a keyboard (stdin is not a Terminal) every answer must come from the options.
+# Say exactly which ones are missing instead of failing halfway.
+if [ ! -t 0 ]; then
+  MISSING=""
+  add_missing() { MISSING="${MISSING}${MISSING:+, }$1"; }
+  if [ "$FLAG_KEEP" = "yes" ]; then
+    [ -f "$CONFIG_FILE" ] || die "--keep-config was given but there is no settings file at $CONFIG_FILE yet. Give your answers with --folders, --music, --traktor, --rekordbox and --interval instead."
+  elif [ -f "$CONFIG_FILE" ] && [ "$HAVE_ANSWER_FLAGS" = "no" ]; then
+    add_missing "--keep-config (use the settings file you already have; or give new answers with the options below)"
+  else
+    [ -n "$FLAG_FOLDERS" ] || add_missing '--folders "<path>"'
+    [ -n "$FLAG_MUSIC" ] || add_missing "--music yes|no"
+    [ -n "$FLAG_TRAKTOR" ] || add_missing "--traktor yes|no"
+    [ -n "$FLAG_REKORDBOX" ] || add_missing "--rekordbox xml|db|off"
+    [ -n "$FLAG_INTERVAL" ] || add_missing "--interval <minutes>"
+  fi
+  if [ "$FLAG_AGENT" = "yes" ] && [ "$FLAG_YES" != "yes" ]; then
+    add_missing "--yes (install the background job; or --agent no to stop after the dry run)"
+  fi
+  if [ -n "$MISSING" ]; then
+    die "install.sh was not run from a Terminal window, so it cannot ask questions. Add these options and run it again: $MISSING
+Run ./install.sh --help to see what each one means."
+  fi
+fi
 
 # The background job does not see your shell settings, so keep the config in the
 # standard place for both.
@@ -116,13 +297,20 @@ say "Folder: $REPO_DIR"
 # Step 1: Node and npm
 # ---------------------------------------------------------------------------
 
+step "Checking git"
+
+if ! git --version >/dev/null 2>&1; then
+  die "git is not installed. Run: xcode-select --install (Apple's Command Line Tools include git). Click Install in the window that opens and wait 5 to 10 minutes. Then open a new Terminal window and run ./install.sh again."
+fi
+say "$(git --version)"
+
 step "Checking Node.js"
 
 if ! command -v node >/dev/null 2>&1; then
-  die "Node.js is not installed. Install version 22.18 or newer from https://nodejs.org (or run: brew install node), then run install.sh again."
+  die_node "Node.js is not installed. playlist-sync needs Node 22.18 or newer."
 fi
 if ! command -v npm >/dev/null 2>&1; then
-  die "npm was not found. It normally comes with Node.js: install Node 22.18 or newer from https://nodejs.org (or run: brew install node), then run install.sh again."
+  die_node "npm was not found. It comes with Node.js, so Node is missing or not installed properly. playlist-sync needs Node 22.18 or newer."
 fi
 
 NODE_VERSION="$(node -v)"
@@ -134,7 +322,7 @@ case "$NODE_MAJOR$NODE_MINOR" in
   *[!0-9]*|"") die "Could not understand the Node version \"$NODE_VERSION\"." ;;
 esac
 if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 18 ]; }; then
-  die "Node $NODE_VERSION is too old. playlist-sync needs 22.18 or newer. Get it from https://nodejs.org (or run: brew install node), then run install.sh again."
+  die_node "Node $NODE_VERSION is too old. playlist-sync needs Node 22.18 or newer."
 fi
 NODE_BIN="$(command -v node)"
 say "Node $NODE_VERSION found at $NODE_BIN"
@@ -153,7 +341,7 @@ config_value() {
   node -e 'const c = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log(eval(process.argv[2]));' "$CONFIG_FILE" "$1"
 }
 
-ask_questions() {
+q_folders() {
   step "Your music folders"
   say "Every folder directly inside a music folder becomes a playlist."
   say "Enter one music folder per line. Press Return on an empty line when you are done."
@@ -181,10 +369,15 @@ ask_questions() {
   say "Music folders:"
   printf '  %s\n' "$FOLDERS"
 
+}
+
+q_music() {
   step "Apple Music"
   ask_yn "Write playlists to Apple Music?" "yes"
   MUSIC_ENABLED="$YN"
+}
 
+q_traktor() {
   step "Traktor"
   ask_yn "Write playlists to Traktor?" "no"
   TRAKTOR_ENABLED="$YN"
@@ -218,6 +411,9 @@ ask_questions() {
     done
   fi
 
+}
+
+q_rekordbox() {
   step "rekordbox"
   REKORDBOX_MODE=""
   while [ -z "$REKORDBOX_MODE" ]; do
@@ -246,6 +442,9 @@ EOF
     esac
   done
 
+}
+
+q_interval() {
   step "How often"
   INTERVAL=""
   while [ -z "$INTERVAL" ]; do
@@ -261,6 +460,66 @@ EOF
         ;;
     esac
   done
+}
+
+# Answers that came from options (see --help) are used as they are; the rest are asked.
+apply_traktor_flags() {
+  TRAKTOR_ENABLED="$FLAG_TRAKTOR"
+  TRAKTOR_COLLECTION="$DEFAULT_TRAKTOR"
+  if [ "$TRAKTOR_ENABLED" = "yes" ]; then
+    if [ -n "$FLAG_TRAKTOR_COLLECTION" ]; then
+      TRAKTOR_COLLECTION="$(clean_path "$FLAG_TRAKTOR_COLLECTION")"
+      if [ ! -f "$(expand_tilde "$TRAKTOR_COLLECTION")" ]; then
+        die "I cannot find a file at \"$TRAKTOR_COLLECTION\" (--traktor-collection). Open Traktor once so it creates its collection, or check the path."
+      fi
+    else
+      if [ ! -f "$TRAKTOR_COLLECTION" ]; then
+        found=""
+        for candidate in "/Users/Shared/Native Instruments/Traktor Pro "*/collection.nml; do
+          if [ -f "$candidate" ]; then
+            found="$candidate"
+          fi
+        done
+        if [ -n "$found" ]; then
+          TRAKTOR_COLLECTION="$found"
+        fi
+      fi
+      if [ ! -f "$TRAKTOR_COLLECTION" ]; then
+        die "I cannot find Traktor's collection.nml (looked for $TRAKTOR_COLLECTION). Open Traktor once so it creates its collection, then give its path with --traktor-collection, or use --traktor no."
+      fi
+    fi
+  fi
+}
+
+ask_questions() {
+  if [ -n "$FLAG_FOLDERS" ]; then
+    FOLDERS="$FLAG_FOLDERS"
+    step "Your music folders"
+    say "Music folders:"
+    printf '  %s\n' "$FOLDERS"
+  else
+    q_folders
+  fi
+  if [ -n "$FLAG_MUSIC" ]; then
+    MUSIC_ENABLED="$FLAG_MUSIC"
+  else
+    q_music
+  fi
+  if [ -n "$FLAG_TRAKTOR" ]; then
+    apply_traktor_flags
+  else
+    q_traktor
+  fi
+  if [ -n "$FLAG_REKORDBOX" ]; then
+    REKORDBOX_MODE="$FLAG_REKORDBOX"
+  else
+    q_rekordbox
+  fi
+  if [ -n "$FLAG_INTERVAL" ]; then
+    INTERVAL="$FLAG_INTERVAL"
+  else
+    q_interval
+  fi
   STAGING="$DEFAULT_STAGING"
 }
 
@@ -294,18 +553,28 @@ write_config() {
 
 # Asked FIRST, so a kept config never throws away answers typed for nothing.
 KEEP_CONFIG="no"
-if [ -f "$CONFIG_FILE" ]; then
+if [ -f "$CONFIG_FILE" ] && { [ "$FLAG_KEEP" = "yes" ] || [ "$HAVE_ANSWER_FLAGS" = "no" ]; }; then
   step "Your settings"
   say "A settings file already exists at $CONFIG_FILE:"
   echo "-----"
   cat "$CONFIG_FILE"
   echo "-----"
-  ask_yn "A config exists, keep it?" "yes"
+  if [ "$FLAG_KEEP" = "yes" ]; then
+    YN="yes"
+  else
+    ask_yn "A config exists, keep it?" "yes"
+  fi
   KEEP_CONFIG="$YN"
+elif [ -f "$CONFIG_FILE" ]; then
+  say "A settings file already exists at $CONFIG_FILE; the answers you gave on the command line replace it."
 fi
 
 if [ "$KEEP_CONFIG" = "yes" ]; then
-  say "Keeping your settings file (no questions). To change it, run install.sh again and answer no."
+  if [ "$FLAG_KEEP" = "yes" ]; then
+    say "Keeping your settings file (--keep-config, no questions)."
+  else
+    say "Keeping your settings file (no questions). To change it, run install.sh again and answer no."
+  fi
   REKORDBOX_MODE="$(config_value 'c.apps && c.apps.rekordbox || "off"')"
   STAGING="$(config_value 'c.stagingDir || "'"$DEFAULT_STAGING"'"')"
   INTERVAL="$(config_value 'c.intervalMinutes || '"$DEFAULT_INTERVAL")"
@@ -326,7 +595,7 @@ fi
 if [ "$REKORDBOX_MODE" = "db" ]; then
   step "Setting up Python for rekordbox database mode"
   if ! command -v python3 >/dev/null 2>&1; then
-    die "python3 was not found. Install it (run: xcode-select --install, or brew install python), then run install.sh again."
+    die "python3 was not found, and rekordbox db mode needs it. Run: xcode-select --install (Apple's Command Line Tools include Python 3), or: brew install python. Then open a new Terminal window and run ./install.sh again."
   fi
   if [ ! -f "$REPO_DIR/requirements.txt" ]; then
     die "Cannot find requirements.txt in $REPO_DIR. Is the download complete?"
@@ -359,6 +628,16 @@ if ! (cd "$REPO_DIR" && node src/cli.ts auto --dry-run); then
   warn "The dry run reported a problem (see above)."
 fi
 
+if [ "$FLAG_AGENT" = "no" ]; then
+  step "The background job"
+  say "Not installed (--agent no). Your settings are saved and the dry run is above."
+  if [ "$MUSIC_ENABLED" = "yes" ]; then
+    say "Apple Music needs two clicks of yours before the first real write: see \"Apple Music\" in the README."
+  fi
+  say "Run install.sh again without --agent no (or with --keep-config --yes) when you are ready."
+  exit 0
+fi
+
 # ---------------------------------------------------------------------------
 # Step 5: Apple Music manual steps, also before the first real write
 # ---------------------------------------------------------------------------
@@ -380,7 +659,11 @@ if [ "$MUSIC_ENABLED" = "yes" ]; then
 
    launchctl kickstart gui/$(id -u)/$LABEL
 EOF
-  ask "Press Return once step 1 is done" "done"
+  if [ "$FLAG_YES" = "yes" ]; then
+    say "(--yes: carrying on without waiting. Do step 1 before the first real write.)"
+  else
+    ask "Press Return once step 1 is done" "done"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -390,7 +673,12 @@ fi
 step "The background job"
 say "Once installed it runs straight away, then every $INTERVAL minutes and at login, and writes"
 say "what the dry run above showed to the apps (only while they are closed; backups first)."
-ask_yn "Install the background job now?" "yes"
+if [ "$FLAG_YES" = "yes" ]; then
+  YN="yes"
+  say "Installing the background job (--yes)."
+else
+  ask_yn "Install the background job now?" "yes"
+fi
 if [ "$YN" != "yes" ]; then
   say "Not installed. Run install.sh again when you are ready."
   exit 0

@@ -17,6 +17,25 @@ playlist-sync is a free macOS tool that turns a DJ's music folders into playlist
 - Tests: `npm test`.
 - Keep edits to `src/` small and covered by a test.
 
+## Setting up for a user
+
+When a user asks you to set up playlist-sync, do it in this order. The users are mostly DJs who are new to Terminal: use plain language and explain what each step does.
+
+1. Check the prerequisites: `git --version`, `node -v` (must be 22.18 or newer) and, only if the user wants rekordbox `db` mode, `python3 --version`.
+2. If something is missing, show the user the matching commands from the README section "Before you start" (`xcode-select --install` for git and Python 3, the Node installer from https://nodejs.org or `brew install node`) and run them only after the user says yes. `xcode-select --install` opens a window the user must click Install in and takes 5 to 10 minutes. After installing Node, re-check `node -v` in a new shell.
+3. Ask, in plain language: which music folder(s) hold their music (each folder inside becomes a playlist); whether to write to Apple Music; whether to write to Traktor; which rekordbox mode (`xml`: writes a file they import in rekordbox, nothing touches their library, the safe choice; `db`: writes rekordbox's own database directly while rekordbox is closed, so playlists just appear, but it is unofficial and could damage their library; `off`: leave rekordbox alone); and how often to check (minutes, default 30).
+4. For `db`, first show the user the warning from the README ("rekordbox: choose how it writes") and get an explicit yes. Only then pass `--accept-db-risk`. Never pass it on your own.
+5. Run the installer without a Terminal, with the answers as flags and `--yes`. Run `./install.sh --help` for the full list. For example:
+
+   ```bash
+   ./install.sh --folders "$HOME/Music/DJ" --music yes --traktor no --rekordbox xml --interval 30 --yes
+   ```
+
+   Flags: `--folders <path>` (repeat, or separate paths with `:`), `--music yes|no`, `--traktor yes|no`, `--traktor-collection <path>`, `--rekordbox xml|db|off`, `--interval <minutes>`, `--keep-config` (use the existing settings and ask nothing), `--accept-db-risk`, `--agent yes|no`, `--yes`. If an answer is missing the script stops and names the flag.
+6. Show the user the dry run the installer prints. Explain what it would add.
+7. Tell the user the two Apple Music clicks (the last two bullets under Rules), if Apple Music is on.
+8. Never run `folders --apply` yourself unless the user asks and rekordbox, Music and Traktor are closed.
+
 ## Useful commands
 
 ```bash
