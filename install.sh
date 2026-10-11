@@ -116,12 +116,16 @@ With no options, install.sh asks you each question. To answer up front instead
   --traktor yes|no           Write playlists to Traktor.
   --traktor-collection PATH  Where Traktor's collection.nml is (found automatically if left out).
   --rekordbox xml|db|off     How to write rekordbox (see the README).
+  --mirrors all|none|LIST    Copy each app's own playlists into the other apps, as "From …" folders.
+                             LIST names the apps that get them: music,traktor,rekordbox (comma list).
+                             Only asked when two or more apps are on. --yes alone means all.
   --interval MINUTES         Check for changes every N minutes, 1 to 1440.
   --keep-config              Use the settings file you already have and ask nothing.
   --accept-db-risk           Needed with --rekordbox db: you have read the README warning.
   --agent yes|no             Install the background job (default yes). "no" stops after the dry run.
-  --yes                      Answer yes to "Install the background job now?" and skip the
-                             Apple Music "press Return" pause.
+  --yes                      Answer yes to "Install the background job now?" and to the
+                             "From …" folders question (unless --mirrors is given), and skip
+                             the Apple Music "press Return" pause.
   --help                     Show this text.
 
 When every answer comes from options (or --keep-config), nothing is read from the
@@ -131,7 +135,7 @@ there is no keyboard, it stops and lists exactly which options to add.
 If a settings file already exists and you give answers, your answers replace it.
 
 Example:
-  ./install.sh --folders ~/Music/DJ --music yes --traktor no --rekordbox xml --interval 30 --yes
+  ./install.sh --folders ~/Music/DJ --music yes --traktor no --rekordbox xml --mirrors all --interval 30 --yes
 EOF
 }
 
@@ -142,6 +146,7 @@ FLAG_TRAKTOR=""
 FLAG_TRAKTOR_COLLECTION=""
 FLAG_REKORDBOX=""
 FLAG_INTERVAL=""
+FLAG_MIRRORS=""
 FLAG_KEEP="no"
 FLAG_ACCEPT_DB_RISK="no"
 FLAG_AGENT="yes"
@@ -171,7 +176,7 @@ while [ $# -gt 0 ]; do
     --keep-config)    FLAG_KEEP="yes"; continue ;;
     --accept-db-risk) FLAG_ACCEPT_DB_RISK="yes"; continue ;;
     --yes)            FLAG_YES="yes"; continue ;;
-    --folders|--music|--traktor|--traktor-collection|--rekordbox|--interval|--agent)
+    --folders|--music|--traktor|--traktor-collection|--rekordbox|--mirrors|--interval|--agent)
       if [ "$HAS_INLINE" = "yes" ]; then
         VALUE="$INLINE"
       elif [ $# -gt 0 ]; then
@@ -200,6 +205,22 @@ while [ $# -gt 0 ]; do
       case "$REK_LOWER" in
         xml|db|off) FLAG_REKORDBOX="$REK_LOWER" ;;
         *) die "--rekordbox must be xml, db or off (you gave \"$VALUE\"). See ./install.sh --help" ;;
+      esac
+      ;;
+    --mirrors)
+      MIR_LOWER="$(printf '%s' "$VALUE" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+      case "$MIR_LOWER" in
+        all|none) FLAG_MIRRORS="$MIR_LOWER" ;;
+        *)
+          FLAG_MIRRORS=""
+          for part in $(printf '%s' "$MIR_LOWER" | tr ',' ' '); do
+            case "$part" in
+              music|traktor|rekordbox) FLAG_MIRRORS="${FLAG_MIRRORS}${FLAG_MIRRORS:+,}$part" ;;
+              *) die "--mirrors takes all, none, or a comma list of music, traktor, rekordbox (you gave \"$VALUE\"). See ./install.sh --help" ;;
+            esac
+          done
+          [ -n "$FLAG_MIRRORS" ] || die "--mirrors needs all, none, or a comma list of music, traktor, rekordbox. See ./install.sh --help"
+          ;;
       esac
       ;;
     --interval)
@@ -235,11 +256,11 @@ if [ -n "$FLAG_FOLDERS_RAW" ]; then
 fi
 
 HAVE_ANSWER_FLAGS="no"
-if [ -n "$FLAG_FOLDERS$FLAG_MUSIC$FLAG_TRAKTOR$FLAG_TRAKTOR_COLLECTION$FLAG_REKORDBOX$FLAG_INTERVAL" ]; then
+if [ -n "$FLAG_FOLDERS$FLAG_MUSIC$FLAG_TRAKTOR$FLAG_TRAKTOR_COLLECTION$FLAG_REKORDBOX$FLAG_MIRRORS$FLAG_INTERVAL" ]; then
   HAVE_ANSWER_FLAGS="yes"
 fi
 if [ "$FLAG_KEEP" = "yes" ] && [ "$HAVE_ANSWER_FLAGS" = "yes" ]; then
-  die "--keep-config uses the settings you already have, so it cannot be combined with --folders, --music, --traktor, --rekordbox or --interval. Use one or the other."
+  die "--keep-config uses the settings you already have, so it cannot be combined with --folders, --music, --traktor, --rekordbox, --mirrors or --interval. Use one or the other."
 fi
 
 # ---------------------------------------------------------------------------
@@ -271,6 +292,16 @@ if [ ! -t 0 ]; then
     [ -n "$FLAG_TRAKTOR" ] || add_missing "--traktor yes|no"
     [ -n "$FLAG_REKORDBOX" ] || add_missing "--rekordbox xml|db|off"
     [ -n "$FLAG_INTERVAL" ] || add_missing "--interval <minutes>"
+    # The "From …" folders question is asked only when two or more apps are on (--yes answers it with all).
+    if [ -z "$FLAG_MIRRORS" ] && [ "$FLAG_YES" != "yes" ]; then
+      APPS_ON=0
+      if [ "$FLAG_MUSIC" = "yes" ]; then APPS_ON=$((APPS_ON + 1)); fi
+      if [ "$FLAG_TRAKTOR" = "yes" ]; then APPS_ON=$((APPS_ON + 1)); fi
+      if [ "$FLAG_REKORDBOX" = "xml" ] || [ "$FLAG_REKORDBOX" = "db" ]; then APPS_ON=$((APPS_ON + 1)); fi
+      if [ -z "$FLAG_MUSIC" ] || [ -z "$FLAG_TRAKTOR" ] || [ -z "$FLAG_REKORDBOX" ] || [ "$APPS_ON" -ge 2 ]; then
+        add_missing "--mirrors all|none|music,traktor,rekordbox (which apps get the other apps' playlists as \"From …\" folders; --yes means all)"
+      fi
+    fi
   fi
   if [ "$FLAG_AGENT" = "yes" ] && [ "$FLAG_YES" != "yes" ]; then
     add_missing "--yes (install the background job; or --agent no to stop after the dry run)"
@@ -444,6 +475,97 @@ EOF
 
 }
 
+# The apps that are on, in the order the "From …" questions ask about them: $MIRROR_TARGETS, $MIRROR_COUNT.
+mirror_targets() {
+  MIRROR_TARGETS=""
+  if [ "$MUSIC_ENABLED" = "yes" ]; then MIRROR_TARGETS="$MIRROR_TARGETS music"; fi
+  if [ "$TRAKTOR_ENABLED" = "yes" ]; then MIRROR_TARGETS="$MIRROR_TARGETS traktor"; fi
+  if [ "$REKORDBOX_MODE" = "xml" ] || [ "$REKORDBOX_MODE" = "db" ]; then MIRROR_TARGETS="$MIRROR_TARGETS rekordbox"; fi
+  MIRROR_TARGETS="${MIRROR_TARGETS# }"
+  MIRROR_COUNT=0
+  for _ in $MIRROR_TARGETS; do MIRROR_COUNT=$((MIRROR_COUNT + 1)); done
+}
+
+app_label() {
+  case "$1" in
+    music) printf 'Apple Music' ;;
+    traktor) printf 'Traktor' ;;
+    rekordbox) printf 'rekordbox' ;;
+  esac
+}
+
+from_label() {
+  case "$1" in
+    music) printf '"From Music"' ;;
+    traktor) printf '"From Traktor"' ;;
+    rekordbox) printf '"From rekordbox"' ;;
+  esac
+}
+
+# The answers as "music=yes,traktor=no" ($MIRRORS_SET, written to config.json) and the names of the apps that get
+# "From …" folders ($MIRRORS_ON_NAMES, for the last screen). Empty when fewer than two apps are on.
+mirrors_add() {
+  MIRRORS_SET="${MIRRORS_SET}${MIRRORS_SET:+,}$1=$2"
+  if [ "$2" = "yes" ]; then
+    MIRRORS_ON_NAMES="${MIRRORS_ON_NAMES}${MIRRORS_ON_NAMES:+, }$(app_label "$1")"
+  fi
+}
+
+q_mirrors() {
+  step "Playlists between the apps"
+  say 'Your own playlists can be copied between the apps, each app'"'"'s in its own "From …" folder. See what it would write first with: node src/cli.ts mirrors'
+  for app in $MIRROR_TARGETS; do
+    others=""
+    for other in rekordbox music traktor; do
+      if [ "$other" != "$app" ]; then
+        case " $MIRROR_TARGETS " in
+          *" $other "*) others="${others}${others:+ / }$(from_label "$other")" ;;
+        esac
+      fi
+    done
+    extra=""
+    if [ "$app" = "rekordbox" ] && [ "$REKORDBOX_MODE" = "xml" ]; then
+      extra=" They go into rekordbox.xml too."
+    fi
+    ask_yn "Also put the other apps' playlists into $(app_label "$app") (a $others folder)?$extra" "yes"
+    mirrors_add "$app" "$YN"
+  done
+}
+
+# --mirrors all|none|<list>, or --yes alone (= all).
+apply_mirrors_flags() {
+  local choice="$1" app
+  step "Playlists between the apps"
+  for app in $MIRROR_TARGETS; do
+    case "$choice" in
+      all) mirrors_add "$app" "yes" ;;
+      none) mirrors_add "$app" "no" ;;
+      *)
+        case ",$choice," in
+          *",$app,"*) mirrors_add "$app" "yes" ;;
+          *) mirrors_add "$app" "no" ;;
+        esac
+        ;;
+    esac
+  done
+  case "$choice" in
+    all|none) ;;
+    *)
+      for app in $(printf '%s' "$choice" | tr ',' ' '); do
+        case " $MIRROR_TARGETS " in
+          *" $app "*) ;;
+          *) say "(--mirrors $app left out: $(app_label "$app") is not on.)" ;;
+        esac
+      done
+      ;;
+  esac
+  if [ -n "$MIRRORS_ON_NAMES" ]; then
+    say "The other apps' playlists go into: $MIRRORS_ON_NAMES (as \"From …\" folders)."
+  else
+    say "The other apps' playlists are not copied into any app."
+  fi
+}
+
 q_interval() {
   step "How often"
   INTERVAL=""
@@ -515,6 +637,21 @@ ask_questions() {
   else
     q_rekordbox
   fi
+  MIRRORS_SET=""
+  MIRRORS_ON_NAMES=""
+  mirror_targets
+  if [ "$MIRROR_COUNT" -lt 2 ]; then
+    # A lone app has nothing to copy from: nothing is asked or set.
+    if [ -n "$FLAG_MIRRORS" ] && [ "$FLAG_MIRRORS" != "none" ]; then
+      say "(--mirrors left out: fewer than two apps are on, so there is nothing to copy between them.)"
+    fi
+  elif [ -n "$FLAG_MIRRORS" ]; then
+    apply_mirrors_flags "$FLAG_MIRRORS"
+  elif [ "$FLAG_YES" = "yes" ]; then
+    apply_mirrors_flags "all"
+  else
+    q_mirrors
+  fi
   if [ -n "$FLAG_INTERVAL" ]; then
     INTERVAL="$FLAG_INTERVAL"
   else
@@ -531,6 +668,7 @@ write_config() {
   PS_TRAKTOR="$TRAKTOR_ENABLED" \
   PS_TRAKTOR_PATH="$TRAKTOR_COLLECTION" \
   PS_REKORDBOX="$REKORDBOX_MODE" \
+  PS_MIRRORS="$MIRRORS_SET" \
   PS_STAGING="$STAGING" \
   PS_INTERVAL="$INTERVAL" \
   node -e '
@@ -542,6 +680,9 @@ write_config() {
         music: e.PS_MUSIC === "yes",
         traktor: { enabled: e.PS_TRAKTOR === "yes", collection: e.PS_TRAKTOR_PATH }
       },
+      mirrors: Object.fromEntries(
+        e.PS_MIRRORS.split(",").filter(Boolean).map((p) => [p.split("=")[0], p.split("=")[1] === "yes"])
+      ),
       stagingDir: e.PS_STAGING,
       intervalMinutes: Number(e.PS_INTERVAL)
     };
@@ -579,6 +720,12 @@ if [ "$KEEP_CONFIG" = "yes" ]; then
   STAGING="$(config_value 'c.stagingDir || "'"$DEFAULT_STAGING"'"')"
   INTERVAL="$(config_value 'c.intervalMinutes || '"$DEFAULT_INTERVAL")"
   MUSIC_ENABLED="$(config_value 'c.apps && c.apps.music === true ? "yes" : "no"')"
+  # The kept "mirrors" setting, as names for the last screen (only apps that are on count).
+  MIRRORS_ON_NAMES="$(config_value '(() => { const m = c.mirrors || {}, a = c.apps || {}, on = [];
+    if (m.music === true && a.music === true) on.push("Apple Music");
+    if (m.traktor === true && a.traktor && a.traktor.enabled === true) on.push("Traktor");
+    if (m.rekordbox === true && (a.rekordbox === "xml" || a.rekordbox === "db")) on.push("rekordbox");
+    return on.length > 1 ? on.join(", ") : ""; })()')"
   case "$INTERVAL" in
     ""|*[!0-9]*) die "intervalMinutes in $CONFIG_FILE is not a whole number." ;;
   esac
@@ -778,3 +925,10 @@ Run the background job now: launchctl kickstart gui/$(id -u)/$LABEL
 Change your answers:        run "$REPO_DIR/install.sh" again
 Uninstall:                  "$REPO_DIR/uninstall.sh"
 EOF
+if [ -n "$MIRRORS_ON_NAMES" ]; then
+  cat <<EOF
+
+The other apps' playlists go into $MIRRORS_ON_NAMES: each gets its "From …" folders the first time that app is closed after the job runs.
+To turn one off, set it to false under "mirrors" in $CONFIG_FILE (if you ever ran mirrors --apply for it, also remove it from "mirror_apps" in $STAGING_ABS/state.json).
+EOF
+fi

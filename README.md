@@ -25,7 +25,7 @@ The quickest way. You need [Claude Code](https://claude.com/claude-code) install
 Set up https://github.com/wodumedia/playlist-sync for my library: read README.md and CLAUDE.md, ask me which folders and apps I use, run install.sh, then show me the dry run.
 ```
 
-Claude reads this README and `CLAUDE.md`, checks what your Mac has, asks which folders and apps you use, runs the installer with your answers (`install.sh` takes them as options, so Claude does not need to type into a Terminal window) and shows you the dry run.
+Claude reads this README and `CLAUDE.md`, checks what your Mac has, asks which folders and apps you use and whether playlists should move between them, runs the installer with your answers (`install.sh` takes them as options, so Claude does not need to type into a Terminal window) and shows you the dry run.
 
 **What Claude cannot do for you.** A few steps open a window only you can click, and Claude will tell you when:
 
@@ -73,11 +73,12 @@ git clone https://github.com/wodumedia/playlist-sync.git && cd playlist-sync && 
 * Apple Music: yes or no
 * Traktor: yes or no, and the path to `collection.nml`
 * the rekordbox mode (see below)
+* whether each app gets the other apps' playlists (one yes or no per app, asked when two or more apps are on; see "Playlists move between apps")
 * how often to check, in minutes
 
 If `~/.config/playlist-sync/config.json` already exists it first asks whether to keep it (then it asks nothing else). It writes the config, shows you a dry run and the Apple Music steps, and only then asks to install the launchd agent `com.wodumedia.playlist-sync`, which runs at once, every N minutes and at login. To remove it: `./uninstall.sh` (it removes only the agent's plist; settings, logs and backups stay).
 
-Prefer to answer up front? `./install.sh --help` lists the flags; for example `./install.sh --folders ~/Music/DJ --music yes --traktor no --rekordbox xml --interval 30 --yes`.
+Prefer to answer up front? `./install.sh --help` lists the flags; for example `./install.sh --folders ~/Music/DJ --music yes --traktor no --rekordbox xml --mirrors all --interval 30 --yes`.
 
 The config looks like this:
 
@@ -124,7 +125,9 @@ Your own playlists in one app show up in the others, each app's in its own playl
 * Each app gets its copy as soon as that app alone is closed, without waiting for the others. In rekordbox `xml` mode the `From …` folders go into the same `rekordbox.xml`, so rekordbox never has to be closed.
 * The `From …` folders are the tool's own, like the root folders: a playlist in one that no longer exists in its app is removed. When an app has nothing to copy, its `From …` folder in the other apps is left as it is.
 
-It is off until you turn it on, one app at a time. See what it would write first, then turn it on (that app must be closed):
+It is on for each app you said yes to at install (the installer asks once per app, and yes is the default); each app gets its `From …` folders the first time it is closed after that. To turn one off, set it to `false` under `mirrors` in `config.json`, for example `"mirrors": { "traktor": false }` (if you turned it on with `mirrors --apply`, also take it out of `mirror_apps` in `<stagingDir>/state.json`).
+
+To see what it would write, or to turn an app on later (that app must be closed):
 
 ```bash
 node src/cli.ts mirrors                      # dry run: what each app would get
@@ -142,7 +145,7 @@ The tags you set in rekordbox (My Tags) are read along with its playlists. Every
 * Flat: one playlist per tag, kept up to date like the other mirrors.
 * Tags are never written back into rekordbox, and the other apps have no tags to copy.
 * A tag with no track on disk is left out.
-* No separate switch: it is on whenever `mirrors --apply --music` or `--traktor` is on.
+* No separate switch: it is on whenever mirrors are on for Apple Music or Traktor.
 
 ## Apple Music
 
